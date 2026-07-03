@@ -1,5 +1,5 @@
 import { Link } from '@inertiajs/react';
-import { BookOpen, FolderGit2, LayoutGrid } from 'lucide-react';
+import { BookOpen, FolderGit2, Home, LayoutGrid, Receipt, ScrollText, Users, WalletCards } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
@@ -14,6 +14,11 @@ import {
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
+import { index as expensesIndex } from '@/routes/expenses';
+import { index as housesIndex } from '@/routes/houses';
+import { index as paymentsIndex } from '@/routes/payments';
+import { index as reportsIndex } from '@/routes/reports';
+import { index as residentsIndex } from '@/routes/residents';
 import type { NavItem } from '@/types';
 
 const mainNavItems: NavItem[] = [
@@ -21,6 +26,31 @@ const mainNavItems: NavItem[] = [
         title: 'Dashboard',
         href: dashboard(),
         icon: LayoutGrid,
+    },
+    {
+        title: 'Penghuni',
+        href: residentsIndex(),
+        icon: Users,
+    },
+    {
+        title: 'Rumah',
+        href: housesIndex(),
+        icon: Home,
+    },
+    {
+        title: 'Pembayaran',
+        href: paymentsIndex(),
+        icon: WalletCards,
+    },
+    {
+        title: 'Pengeluaran',
+        href: expensesIndex(),
+        icon: Receipt,
+    },
+    {
+        title: 'Laporan',
+        href: reportsIndex(),
+        icon: ScrollText,
     },
 ];
 
