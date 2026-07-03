@@ -34,6 +34,59 @@ This application is a Laravel application and its main Laravel ecosystems packag
 
 This project has domain-specific skills available in `**/skills/**`. You MUST activate the relevant skill whenever you work in that domain—don't wait until you're stuck.
 
+## Product Context
+
+- This application is `RT Finance & Resident Management`, a web app for RT cash administration and resident management.
+- Treat `PRD.md` as the product source of truth for feature scope, domain terms, and acceptance criteria.
+- Core modules in scope:
+  - authentication for admin/RT
+  - residents (`penghuni`)
+  - houses (`rumah`)
+  - house occupancy history
+  - monthly dues / billing / payments
+  - expenses
+  - monthly and yearly financial reporting
+- Deployment target is local / non-Docker unless the user explicitly asks otherwise.
+
+## Domain Rules From PRD
+
+- Initial housing context:
+  - total houses: 20
+  - 15 typically occupied permanently
+  - 5 may be vacant or temporarily rented
+- Billing defaults:
+  - security fee (`iuran satpam`): Rp100.000 / month
+  - cleaning fee (`iuran kebersihan`): Rp15.000 / month
+- Billing rules:
+  - permanently occupied houses are billed every month
+  - contracted / temporary occupancy is billed only while an active resident exists
+  - vacant houses are not billed
+  - multi-month payments, including yearly payments, must be supported
+- Payment and expense records are financial data. Favor database transactions, validation, and audit-friendly history over convenience shortcuts.
+
+## Product Delivery Rules
+
+- Backend remains Laravel, frontend remains React, database remains MySQL.
+- Keep backend and frontend logically separated even when implemented inside one repository.
+- Prefer REST-style backend endpoints and structured server/client contracts.
+- Do not introduce Docker-specific workflows, files, or instructions unless the user asks for them.
+- When implementing dashboard, table, chart, modal, upload, or reporting work, match the PRD before inventing new behavior.
+
+## UI / UX Rules From PRD
+
+- Frontend UI must use shadcn/ui patterns and components throughout. Reuse existing shadcn/ui components before creating custom visual primitives.
+- The target style is a modern, dense, professional operations dashboard, explicitly closer to Cloudflare than to a marketing page.
+- Use cards only for summary metrics. Detailed records must be rendered as tables.
+- Use tables for resident lists, house lists, bills, payments, occupancy history, expenses, and report details.
+- Use charts for trends, comparisons, and composition:
+  - line chart for time trends
+  - bar chart for comparisons
+  - pie / donut chart for composition
+- CRUD interactions should default to shadcn/ui `Dialog` / `AlertDialog` flows unless complexity clearly requires a dedicated page.
+- Image uploads such as KTP photos and expense receipts must show preview before save.
+- All forms, validation feedback, loading states, empty states, and toast feedback should follow shadcn/ui patterns.
+- Responsive behavior for desktop, tablet, and mobile is required, but desktop dashboard usability is the primary workflow.
+
 ## Conventions
 
 - You must follow all existing code conventions used in this application. When creating or editing a file, check sibling files for the correct structure, approach, and naming.
