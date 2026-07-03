@@ -1,9 +1,10 @@
 import { Head, Link, usePage } from '@inertiajs/react';
 import { dashboard, login } from '@/routes';
 import { register } from '@/routes';
+import type { SharedPageProps } from '@/types';
 
 export default function Welcome() {
-    const { auth } = usePage().props;
+    const { auth } = usePage<SharedPageProps>().props;
 
     return (
         <>
