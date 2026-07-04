@@ -1,6 +1,7 @@
 import { router } from '@inertiajs/react';
 import { ImageIcon, Trash2 } from 'lucide-react';
-import { ReactNode, useEffect, useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
+import { useEffect, useState } from 'react';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -14,7 +15,12 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { TableCell, TableRow } from '@/components/ui/table';
 
@@ -49,30 +55,50 @@ export function formatWibDateTime(value?: string | null): string {
         return '-';
     }
 
-    const date = /^\d{4}-\d{2}-\d{2}$/.test(value) ? new Date(`${value}T00:00:00+07:00`) : new Date(value);
+    const date = /^\d{4}-\d{2}-\d{2}$/.test(value)
+        ? new Date(`${value}T00:00:00+07:00`)
+        : new Date(value);
 
-    return new Intl.DateTimeFormat('id-ID', {
-        timeZone: 'Asia/Jakarta',
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: false,
-    }).format(date).replace(/\./g, ':') + ' WIB';
+    return (
+        new Intl.DateTimeFormat('id-ID', {
+            timeZone: 'Asia/Jakarta',
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false,
+        })
+            .format(date)
+            .replace(/\./g, ':') + ' WIB'
+    );
 }
 
 export function StatusBadge({ value }: { value: string }) {
-    const variant = value === 'lunas' || value === 'dihuni' ? 'default' : value === 'sebagian' ? 'secondary' : 'outline';
+    const variant =
+        value === 'lunas' || value === 'dihuni'
+            ? 'default'
+            : value === 'sebagian'
+              ? 'secondary'
+              : 'outline';
 
     return <Badge variant={variant}>{value.replace('_', ' ')}</Badge>;
 }
 
-export function EmptyRow({ colSpan, label = 'Tidak ada data.' }: { colSpan: number; label?: string }) {
+export function EmptyRow({
+    colSpan,
+    label = 'Tidak ada data.',
+}: {
+    colSpan: number;
+    label?: string;
+}) {
     return (
         <TableRow>
-            <TableCell colSpan={colSpan} className="h-24 text-center text-muted-foreground">
+            <TableCell
+                colSpan={colSpan}
+                className="h-24 text-center text-muted-foreground"
+            >
                 {label}
             </TableCell>
         </TableRow>
@@ -80,7 +106,9 @@ export function EmptyRow({ colSpan, label = 'Tidak ada data.' }: { colSpan: numb
 }
 
 export function Pagination({ links }: { links: PaginationLink[] }) {
-    const visibleLinks = links.filter((link) => !['&laquo; Previous', 'Next &raquo;'].includes(link.label));
+    const visibleLinks = links.filter(
+        (link) => !['&laquo; Previous', 'Next &raquo;'].includes(link.label),
+    );
 
     if (visibleLinks.length <= 1) {
         return null;
@@ -94,7 +122,10 @@ export function Pagination({ links }: { links: PaginationLink[] }) {
                     size="sm"
                     variant={link.active ? 'default' : 'outline'}
                     disabled={!link.url}
-                    onClick={() => link.url && router.visit(link.url, { preserveScroll: true })}
+                    onClick={() =>
+                        link.url &&
+                        router.visit(link.url, { preserveScroll: true })
+                    }
                 >
                     {link.label}
                 </Button>
@@ -122,13 +153,24 @@ export function DebouncedSearchInput({
                 return;
             }
 
-            router.get(url, { ...filters, [param]: value }, { preserveState: true, preserveScroll: true });
+            router.get(
+                url,
+                { ...filters, [param]: value },
+                { preserveState: true, preserveScroll: true },
+            );
         }, 500);
 
         return () => window.clearTimeout(timeout);
     }, [filters, param, url, value]);
 
-    return <Input className="w-64" placeholder={placeholder} value={value} onChange={(event) => setValue(event.target.value)} />;
+    return (
+        <Input
+            className="w-64"
+            placeholder={placeholder}
+            value={value}
+            onChange={(event) => setValue(event.target.value)}
+        />
+    );
 }
 
 export function DetailDialog({
@@ -153,7 +195,9 @@ export function DetailDialog({
                 <div className="grid gap-3 text-sm md:grid-cols-2">
                     {fields.map(([label, value]) => (
                         <div key={label} className="grid gap-1">
-                            <span className="text-muted-foreground">{label}</span>
+                            <span className="text-muted-foreground">
+                                {label}
+                            </span>
                             <span className="font-medium">{value}</span>
                         </div>
                     ))}
@@ -178,14 +222,21 @@ export function ConfirmDeleteButton({
     return (
         <AlertDialog>
             <AlertDialogTrigger asChild>
-                <Button size="icon-sm" variant="ghost" disabled={disabled} onClick={(event) => event.stopPropagation()}>
+                <Button
+                    size="icon-sm"
+                    variant="ghost"
+                    disabled={disabled}
+                    onClick={(event) => event.stopPropagation()}
+                >
                     <Trash2 className="size-4" />
                 </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
                 <AlertDialogHeader>
                     <AlertDialogTitle>{title}</AlertDialogTitle>
-                    <AlertDialogDescription>{description}</AlertDialogDescription>
+                    <AlertDialogDescription>
+                        {description}
+                    </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                     <AlertDialogCancel>Batal</AlertDialogCancel>
@@ -204,10 +255,16 @@ export function ConfirmDeleteButton({
     );
 }
 
-export function ImageInput({ name, label, onFile }: { name: string; label: string; onFile?: (file: File | null) => void }) {
+export function ImageInput({
+    name,
+    label,
+    onFile,
+}: {
+    name: string;
+    label: string;
+    onFile?: (file: File | null) => void;
+}) {
     const [preview, setPreview] = useState<string | null>(null);
-
-    const previewUrl = useMemo(() => preview, [preview]);
 
     return (
         <div className="grid gap-2">
@@ -222,8 +279,12 @@ export function ImageInput({ name, label, onFile }: { name: string; label: strin
                 }}
             />
             <div className="flex min-h-28 items-center justify-center rounded-lg border bg-muted/30">
-                {previewUrl ? (
-                    <img src={previewUrl} alt={label} className="max-h-40 rounded-md object-contain" />
+                {preview ? (
+                    <img
+                        src={preview}
+                        alt={label}
+                        className="max-h-40 rounded-md object-contain"
+                    />
                 ) : (
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <ImageIcon className="size-4" />

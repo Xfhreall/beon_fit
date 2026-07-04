@@ -1,11 +1,38 @@
 import { Head } from '@inertiajs/react';
 import { useState } from 'react';
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, XAxis } from 'recharts';
+import {
+    Area,
+    AreaChart,
+    Bar,
+    BarChart,
+    CartesianGrid,
+    Cell,
+    Pie,
+    PieChart,
+    XAxis,
+} from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+    ChartContainer,
+    ChartTooltip,
+    ChartTooltipContent,
+} from '@/components/ui/chart';
+import type { ChartConfig } from '@/components/ui/chart';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
 import { dashboard } from '@/routes';
-import { DetailDialog, EmptyRow, money, StatusBadge } from './rt-finance/shared';
+import {
+    DetailDialog,
+    EmptyRow,
+    money,
+    StatusBadge,
+} from './rt-finance/shared';
 
 type Summary = {
     total_houses: number;
@@ -19,7 +46,12 @@ type Summary = {
     unpaid_bills: number;
 };
 
-type Series = { month: string; income: number; expense: number; balance: number };
+type Series = {
+    month: string;
+    income: number;
+    expense: number;
+    balance: number;
+};
 type Slice = { name: string; value: number };
 type UnpaidBill = {
     id: number;
@@ -71,7 +103,9 @@ export default function Dashboard({
                             <CardHeader>
                                 <CardTitle>{label}</CardTitle>
                             </CardHeader>
-                            <CardContent className="text-2xl font-semibold">{value}</CardContent>
+                            <CardContent className="text-2xl font-semibold">
+                                {value}
+                            </CardContent>
                         </Card>
                     ))}
                 </div>
@@ -82,14 +116,35 @@ export default function Dashboard({
                             <CardTitle>Tren kas 12 bulan</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <ChartContainer config={chartConfig} className="h-72 w-full">
+                            <ChartContainer
+                                config={chartConfig}
+                                className="h-72 w-full"
+                            >
                                 <AreaChart data={yearly}>
                                     <CartesianGrid vertical={false} />
-                                    <XAxis dataKey="month" tickLine={false} axisLine={false} />
-                                    <ChartTooltip content={<ChartTooltipContent />} />
-                                    <Area dataKey="income" fill="var(--color-income)" stroke="var(--color-income)" />
-                                    <Area dataKey="expense" fill="var(--color-expense)" stroke="var(--color-expense)" />
-                                    <Area dataKey="balance" fill="var(--color-balance)" stroke="var(--color-balance)" />
+                                    <XAxis
+                                        dataKey="month"
+                                        tickLine={false}
+                                        axisLine={false}
+                                    />
+                                    <ChartTooltip
+                                        content={<ChartTooltipContent />}
+                                    />
+                                    <Area
+                                        dataKey="income"
+                                        fill="var(--color-income)"
+                                        stroke="var(--color-income)"
+                                    />
+                                    <Area
+                                        dataKey="expense"
+                                        fill="var(--color-expense)"
+                                        stroke="var(--color-expense)"
+                                    />
+                                    <Area
+                                        dataKey="balance"
+                                        fill="var(--color-balance)"
+                                        stroke="var(--color-balance)"
+                                    />
                                 </AreaChart>
                             </ChartContainer>
                         </CardContent>
@@ -100,12 +155,31 @@ export default function Dashboard({
                             <CardTitle>Status rumah</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <ChartContainer config={chartConfig} className="h-72 w-full">
+                            <ChartContainer
+                                config={chartConfig}
+                                className="h-72 w-full"
+                            >
                                 <PieChart>
-                                    <ChartTooltip content={<ChartTooltipContent hideLabel />} />
-                                    <Pie data={houseStatus} dataKey="value" nameKey="name" innerRadius={58}>
+                                    <ChartTooltip
+                                        content={
+                                            <ChartTooltipContent hideLabel />
+                                        }
+                                    />
+                                    <Pie
+                                        data={houseStatus}
+                                        dataKey="value"
+                                        nameKey="name"
+                                        innerRadius={58}
+                                    >
                                         {houseStatus.map((slice, index) => (
-                                            <Cell key={slice.name} fill={index === 0 ? 'var(--color-occupied)' : 'var(--color-vacant)'} />
+                                            <Cell
+                                                key={slice.name}
+                                                fill={
+                                                    index === 0
+                                                        ? 'var(--color-occupied)'
+                                                        : 'var(--color-vacant)'
+                                                }
+                                            />
                                         ))}
                                     </Pie>
                                 </PieChart>
@@ -120,18 +194,52 @@ export default function Dashboard({
                             <CardTitle>Bulan berjalan</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <ChartContainer config={chartConfig} className="h-56 w-full">
+                            <ChartContainer
+                                config={chartConfig}
+                                className="h-56 w-full"
+                            >
                                 <BarChart data={[summary]}>
-                                    <XAxis dataKey={() => 'Kas'} tickLine={false} axisLine={false} />
-                                    <ChartTooltip content={<ChartTooltipContent />} />
-                                    <Bar dataKey="monthly_income" name="Pemasukan" fill="var(--color-income)" radius={4} />
-                                    <Bar dataKey="monthly_expense" name="Pengeluaran" fill="var(--color-expense)" radius={4} />
+                                    <XAxis
+                                        dataKey={() => 'Kas'}
+                                        tickLine={false}
+                                        axisLine={false}
+                                    />
+                                    <ChartTooltip
+                                        content={<ChartTooltipContent />}
+                                    />
+                                    <Bar
+                                        dataKey="monthly_income"
+                                        name="Pemasukan"
+                                        fill="var(--color-income)"
+                                        radius={4}
+                                    />
+                                    <Bar
+                                        dataKey="monthly_expense"
+                                        name="Pengeluaran"
+                                        fill="var(--color-expense)"
+                                        radius={4}
+                                    />
                                 </BarChart>
                             </ChartContainer>
                             <div className="mt-3 grid gap-1 text-sm">
-                                <div className="flex justify-between"><span>Pemasukan</span><strong>{money(summary.monthly_income)}</strong></div>
-                                <div className="flex justify-between"><span>Pengeluaran</span><strong>{money(summary.monthly_expense)}</strong></div>
-                                <div className="flex justify-between"><span>Saldo</span><strong>{money(summary.monthly_balance)}</strong></div>
+                                <div className="flex justify-between">
+                                    <span>Pemasukan</span>
+                                    <strong>
+                                        {money(summary.monthly_income)}
+                                    </strong>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span>Pengeluaran</span>
+                                    <strong>
+                                        {money(summary.monthly_expense)}
+                                    </strong>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span>Saldo</span>
+                                    <strong>
+                                        {money(summary.monthly_balance)}
+                                    </strong>
+                                </div>
                             </div>
                         </CardContent>
                     </Card>
@@ -149,22 +257,47 @@ export default function Dashboard({
                                         <TableHead>Iuran</TableHead>
                                         <TableHead>Periode</TableHead>
                                         <TableHead>Status</TableHead>
-                                        <TableHead className="text-right">Sisa</TableHead>
+                                        <TableHead className="text-right">
+                                            Sisa
+                                        </TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {unpaidBills.length === 0 ? (
                                         <EmptyRow colSpan={6} />
-                                    ) : unpaidBills.map((bill) => (
-                                        <TableRow key={bill.id} className="cursor-pointer" onClick={() => setDetail(bill)}>
-                                            <TableCell>{bill.house}</TableCell>
-                                            <TableCell>{bill.resident}</TableCell>
-                                            <TableCell>{bill.fee_type}</TableCell>
-                                            <TableCell>{bill.period}</TableCell>
-                                            <TableCell><StatusBadge value={bill.status} /></TableCell>
-                                            <TableCell className="text-right">{money(bill.amount_due - bill.amount_paid)}</TableCell>
-                                        </TableRow>
-                                    ))}
+                                    ) : (
+                                        unpaidBills.map((bill) => (
+                                            <TableRow
+                                                key={bill.id}
+                                                className="cursor-pointer"
+                                                onClick={() => setDetail(bill)}
+                                            >
+                                                <TableCell>
+                                                    {bill.house}
+                                                </TableCell>
+                                                <TableCell>
+                                                    {bill.resident}
+                                                </TableCell>
+                                                <TableCell>
+                                                    {bill.fee_type}
+                                                </TableCell>
+                                                <TableCell>
+                                                    {bill.period}
+                                                </TableCell>
+                                                <TableCell>
+                                                    <StatusBadge
+                                                        value={bill.status}
+                                                    />
+                                                </TableCell>
+                                                <TableCell className="text-right">
+                                                    {money(
+                                                        bill.amount_due -
+                                                            bill.amount_paid,
+                                                    )}
+                                                </TableCell>
+                                            </TableRow>
+                                        ))
+                                    )}
                                 </TableBody>
                             </Table>
                         </CardContent>
@@ -183,7 +316,10 @@ export default function Dashboard({
                             ['Status', <StatusBadge value={detail.status} />],
                             ['Tagihan', money(detail.amount_due)],
                             ['Dibayar', money(detail.amount_paid)],
-                            ['Sisa', money(detail.amount_due - detail.amount_paid)],
+                            [
+                                'Sisa',
+                                money(detail.amount_due - detail.amount_paid),
+                            ],
                         ]}
                     />
                 )}

@@ -90,11 +90,6 @@ class PaymentController extends Controller
 
         DB::transaction(function () use ($payment): void {
             $context = $payment->replicate();
-            $context->setAttribute('house_id', $payment->house_id);
-            $context->setAttribute('fee_type_id', $payment->fee_type_id);
-            $context->setAttribute('period_month', $payment->period_month);
-            $context->setAttribute('period_year', $payment->period_year);
-            $context->setAttribute('months_paid', $payment->months_paid);
 
             $payment->delete();
             $this->recalculateBills($context);
