@@ -14,7 +14,7 @@ class UserSeeder extends Seeder
     {
         User::factory()->create([
             'name' => 'Ketua RT',
-            'email' => 'admin@rt.test',
+            'email' => 'admin@gmail.com',
         ]);
     }
 }
