@@ -261,7 +261,10 @@ export function Pagination({
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <span>Tampilkan</span>
                     <Select value={String(perPage)} onValueChange={setPerPage}>
-                        <SelectTrigger size="sm" className="w-20">
+                        <SelectTrigger
+                            size="sm"
+                            className="w-20 bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
+                        >
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -321,7 +324,10 @@ export function useLocalPagination<T>(items: T[], perPage = 10) {
                             setPageSize(Number(value));
                         }}
                     >
-                        <SelectTrigger size="sm" className="w-20">
+                        <SelectTrigger
+                            size="sm"
+                            className="w-20 bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
+                        >
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
