@@ -51,16 +51,20 @@ class DashboardController extends Controller
                 ->orderBy('period_month')
                 ->limit(8)
                 ->get()
-                ->map(fn (Bill $bill): array => [
-                    'id' => $bill->id,
-                    'house' => $bill->house->number,
-                    'resident' => $bill->resident?->name ?? '-',
-                    'fee_type' => $bill->feeType->name,
-                    'period' => sprintf('%02d/%d', $bill->period_month, $bill->period_year),
-                    'amount_due' => $bill->amount_due,
-                    'amount_paid' => $bill->amount_paid,
-                    'status' => $bill->status,
-                ]),
+                ->map(function (Bill $bill): array {
+                    $resident = $bill->resident;
+
+                    return [
+                        'id' => $bill->id,
+                        'house' => $bill->house->number,
+                        'resident' => $resident instanceof Resident ? $resident->name : '-',
+                        'fee_type' => $bill->feeType->name,
+                        'period' => sprintf('%02d/%d', $bill->period_month, $bill->period_year),
+                        'amount_due' => $bill->amount_due,
+                        'amount_paid' => $bill->amount_paid,
+                        'status' => $bill->status,
+                    ];
+                }),
         ]);
     }
 

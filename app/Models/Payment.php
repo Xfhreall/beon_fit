@@ -29,16 +29,19 @@ class Payment extends Model
         ];
     }
 
+    /** @return BelongsTo<House, $this> */
     public function house(): BelongsTo
     {
         return $this->belongsTo(House::class);
     }
 
+    /** @return BelongsTo<Resident, $this> */
     public function resident(): BelongsTo
     {
         return $this->belongsTo(Resident::class);
     }
 
+    /** @return BelongsTo<FeeType, $this> */
     public function feeType(): BelongsTo
     {
         return $this->belongsTo(FeeType::class);

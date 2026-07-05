@@ -7,7 +7,12 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
+/**
+ * @property Carbon $started_at
+ * @property Carbon|null $ended_at
+ */
 #[Fillable(['house_id', 'resident_id', 'started_at', 'ended_at', 'resident_status', 'is_active'])]
 class Occupancy extends Model
 {
@@ -27,11 +32,13 @@ class Occupancy extends Model
         ];
     }
 
+    /** @return BelongsTo<House, $this> */
     public function house(): BelongsTo
     {
         return $this->belongsTo(House::class);
     }
 
+    /** @return BelongsTo<Resident, $this> */
     public function resident(): BelongsTo
     {
         return $this->belongsTo(Resident::class);

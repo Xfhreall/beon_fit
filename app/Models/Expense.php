@@ -7,7 +7,11 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
+/**
+ * @property Carbon $spent_at
+ */
 #[Fillable(['expense_category_id', 'spent_at', 'amount', 'description', 'receipt_path', 'is_routine'])]
 class Expense extends Model
 {
@@ -27,6 +31,7 @@ class Expense extends Model
         ];
     }
 
+    /** @return BelongsTo<ExpenseCategory, $this> */
     public function category(): BelongsTo
     {
         return $this->belongsTo(ExpenseCategory::class, 'expense_category_id');

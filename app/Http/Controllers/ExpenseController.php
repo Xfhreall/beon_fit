@@ -40,7 +40,8 @@ class ExpenseController extends Controller
     public function store(StoreExpenseRequest $request): RedirectResponse
     {
         $data = $request->validated();
-        $data['spent_at'] = CarbonImmutable::parse((string) $data['spent_at'])->toDateTimeString();
+        $spentAt = CarbonImmutable::parse((string) $data['spent_at']);
+        $data['spent_at'] = $spentAt->toDateTimeString();
 
         if ($request->hasFile('receipt')) {
             $data['receipt_path'] = $request->file('receipt')->store('expense-receipts');
@@ -53,15 +54,16 @@ class ExpenseController extends Controller
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Pengeluaran dicatat.']);
 
         return to_route('expenses.index', [
-            'month' => date('n', strtotime((string) $data['spent_at'])),
-            'year' => date('Y', strtotime((string) $data['spent_at'])),
+            'month' => $spentAt->month,
+            'year' => $spentAt->year,
         ]);
     }
 
     public function update(UpdateExpenseRequest $request, Expense $expense): RedirectResponse
     {
         $data = $request->validated();
-        $data['spent_at'] = CarbonImmutable::parse((string) $data['spent_at'])->toDateTimeString();
+        $spentAt = CarbonImmutable::parse((string) $data['spent_at']);
+        $data['spent_at'] = $spentAt->toDateTimeString();
 
         if ($request->hasFile('receipt')) {
             $data['receipt_path'] = $request->file('receipt')->store('expense-receipts');
@@ -74,8 +76,8 @@ class ExpenseController extends Controller
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Pengeluaran diperbarui.']);
 
         return to_route('expenses.index', [
-            'month' => date('n', strtotime((string) $expense->spent_at)),
-            'year' => date('Y', strtotime((string) $expense->spent_at)),
+            'month' => $spentAt->month,
+            'year' => $spentAt->year,
         ]);
     }
 

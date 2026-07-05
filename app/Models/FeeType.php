@@ -26,6 +26,7 @@ class FeeType extends Model
         ];
     }
 
+    /** @return HasMany<Bill, $this> */
     public function bills(): HasMany
     {
         return $this->hasMany(Bill::class);
