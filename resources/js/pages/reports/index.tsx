@@ -127,66 +127,64 @@ export default function ReportsIndex({
                 <div className="grid gap-3 lg:grid-cols-3">
                     <Card className="lg:col-span-2">
                         <CardHeader>
-                            <CardTitle>{`Grafik tahunan semua (Januari ${filters.year} - Desember ${filters.year})`}</CardTitle>
+                            <CardTitle>{`Grafik tahunan (Januari ${filters.year} - Desember ${filters.year})`}</CardTitle>
                         </CardHeader>
-                        <CardContent className="grid gap-3">
-                            <div className="w-full overflow-x-auto">
-                                <ChartContainer
-                                    config={chartConfig}
-                                    className="h-72 w-full min-w-[640px]"
-                                >
-                                    <LineChart data={yearly}>
-                                        <CartesianGrid vertical={false} />
-                                        <XAxis
-                                            dataKey="month"
-                                            tickLine={false}
-                                            axisLine={false}
-                                        />
-                                        <ChartTooltip
-                                            content={<ChartTooltipContent />}
-                                        />
-                                        <ChartLegend
-                                            content={
-                                                <ChartLegendContent className="flex-wrap" />
-                                            }
-                                        />
-                                        <Line
-                                            type="monotone"
-                                            dataKey="income"
-                                            name="Pemasukan"
-                                            stroke="var(--color-income)"
-                                            strokeWidth={2}
-                                            dot={{ r: 3 }}
-                                            activeDot={{ r: 5 }}
-                                        />
-                                        <Line
-                                            type="monotone"
-                                            dataKey="expense"
-                                            name="Pengeluaran"
-                                            stroke="var(--color-expense)"
-                                            strokeWidth={2}
-                                            dot={{ r: 3 }}
-                                            activeDot={{ r: 5 }}
-                                        />
-                                        <Line
-                                            type="monotone"
-                                            dataKey="balance"
-                                            name="Saldo"
-                                            stroke="var(--color-balance)"
-                                            strokeWidth={2}
-                                            dot={{ r: 3 }}
-                                            activeDot={{ r: 5 }}
-                                        />
-                                    </LineChart>
-                                </ChartContainer>
-                            </div>
+                        <CardContent>
+                            <ChartContainer
+                                config={chartConfig}
+                                className="h-72 w-full"
+                            >
+                                <LineChart data={yearly}>
+                                    <CartesianGrid vertical={false} />
+                                    <XAxis
+                                        dataKey="month"
+                                        tickLine={false}
+                                        axisLine={false}
+                                    />
+                                    <ChartTooltip
+                                        content={<ChartTooltipContent />}
+                                    />
+                                    <ChartLegend
+                                        content={
+                                            <ChartLegendContent className="flex-wrap" />
+                                        }
+                                    />
+                                    <Line
+                                        type="monotone"
+                                        dataKey="income"
+                                        name="Pemasukan"
+                                        stroke="var(--color-income)"
+                                        strokeWidth={2}
+                                        dot={{ r: 3 }}
+                                        activeDot={{ r: 5 }}
+                                    />
+                                    <Line
+                                        type="monotone"
+                                        dataKey="expense"
+                                        name="Pengeluaran"
+                                        stroke="var(--color-expense)"
+                                        strokeWidth={2}
+                                        dot={{ r: 3 }}
+                                        activeDot={{ r: 5 }}
+                                    />
+                                    <Line
+                                        type="monotone"
+                                        dataKey="balance"
+                                        name="Saldo"
+                                        stroke="var(--color-balance)"
+                                        strokeWidth={2}
+                                        dot={{ r: 3 }}
+                                        activeDot={{ r: 5 }}
+                                    />
+                                </LineChart>
+                            </ChartContainer>
                         </CardContent>
                     </Card>
                     <Card>
                         <CardHeader>
                             <CardTitle>Komposisi pengeluaran</CardTitle>
                         </CardHeader>
-                        <CardContent className="grid gap-3">
+                        <CardContent>
                             <ChartContainer
                                 config={chartConfig}
                                 className="h-72 w-full"

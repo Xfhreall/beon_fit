@@ -19,7 +19,7 @@ class ResidentFactory extends Factory
     {
         return [
             'name' => fake()->name(),
-            'phone' => fake()->phoneNumber(),
+            'phone' => '08'.fake()->numerify('##########'),
             'resident_status' => fake()->randomElement(['tetap', 'kontrak']),
             'marital_status' => fake()->randomElement(['menikah', 'belum_menikah']),
             'ktp_photo_path' => null,
