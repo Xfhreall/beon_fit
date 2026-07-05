@@ -21,6 +21,7 @@ class HouseController extends Controller
         $filters = [
             'search' => $request->string('search')->toString(),
             'status' => $request->string('status')->toString(),
+            'per_page' => (string) $this->perPage($request),
         ];
 
         $houses = House::query()
@@ -32,7 +33,7 @@ class HouseController extends Controller
             }))
             ->when($filters['status'] !== '', fn ($query) => $query->where('status', $filters['status']))
             ->orderBy('number')
-            ->paginate(12)
+            ->paginate($this->perPage($request))
             ->withQueryString();
 
         return Inertia::render('houses/index', [

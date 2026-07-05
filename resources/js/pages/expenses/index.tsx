@@ -1,6 +1,6 @@
-import { Head, router } from '@inertiajs/react';
-import { useForm as useTanStackForm } from '@tanstack/react-form';
+import { Head, router, useForm } from '@inertiajs/react';
 import { Plus } from 'lucide-react';
+import type { FormEvent } from 'react';
 import { useMemo, useState } from 'react';
 import {
     destroy,
@@ -38,17 +38,15 @@ import {
     ConfirmDeleteButton,
     DetailDialog,
     EmptyRow,
-    FieldError,
-    compareSortValue,
     formatWibDateTime,
     ImageInput,
     money,
     nextSort,
     Pagination,
     period,
-    requiredField,
     SortableTableHead,
     StatusBadge,
+    compareSortValue,
 } from '../rt-finance/shared';
 
 type Category = { id: number; name: string; is_routine: boolean };
@@ -73,12 +71,19 @@ type ExpenseFormData = {
 function expenseFormDefaults(): ExpenseFormData {
     return {
         expense_category_id: '',
-        spent_at: new Date().toISOString().slice(0, 10),
+        spent_at: nowLocalDateTime(),
         amount: '',
         description: '',
         receipt: null,
         is_routine: false,
     };
+}
+
+function nowLocalDateTime(): string {
+    const date = new Date();
+    const pad = (value: number) => String(value).padStart(2, '0');
+
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
 export default function ExpensesIndex({
@@ -88,7 +93,7 @@ export default function ExpensesIndex({
 }: {
     expenses: Paginated<Expense>;
     categories: Category[];
-    filters: { month: number; year: number };
+    filters: { month: number; year: number; per_page: string };
 }) {
     const [open, setOpen] = useState(false);
     const [detail, setDetail] = useState<Expense | null>(null);
@@ -96,11 +101,8 @@ export default function ExpensesIndex({
         key: 'date',
         direction: 'desc',
     });
-    const [processing, setProcessing] = useState(false);
-    const form = useTanStackForm({
-        defaultValues: expenseFormDefaults(),
-        onSubmit: ({ value }) => submit(value),
-    });
+    const form = useForm<ExpenseFormData>(expenseFormDefaults());
+
     const sortedCategories = useMemo(
         () =>
             [...categories].sort((a, b) => {
@@ -142,12 +144,12 @@ export default function ExpensesIndex({
         });
     }, [expenses.data, sort]);
 
-    function submit(value: ExpenseFormData) {
-        router.post(store.url(), value, {
+    function submit(event: FormEvent) {
+        event.preventDefault();
+
+        form.post(store.url(), {
             forceFormData: true,
             preserveScroll: true,
-            onStart: () => setProcessing(true),
-            onFinish: () => setProcessing(false),
             onSuccess: () => setOpen(false),
         });
     }
@@ -171,209 +173,123 @@ export default function ExpensesIndex({
                             </Button>
                         </DialogTrigger>
                         <DialogContent className="sm:max-w-xl">
-                            <form
-                                onSubmit={(event) => {
-                                    event.preventDefault();
-                                    void form.handleSubmit();
-                                }}
-                                className="grid gap-4"
-                            >
+                            <form onSubmit={submit} className="grid gap-4">
                                 <DialogHeader>
                                     <DialogTitle>
                                         Tambah pengeluaran
                                     </DialogTitle>
                                 </DialogHeader>
                                 <div className="grid gap-3 md:grid-cols-2">
-                                    <form.Field
-                                        name="expense_category_id"
-                                        validators={{
-                                            onBlur: requiredField('Kategori'),
-                                            onChange:
-                                                requiredField('Kategori'),
-                                        }}
-                                    >
-                                        {(field) => (
-                                            <div className="grid gap-2">
-                                                <Label>Kategori</Label>
-                                                <Select
-                                                    value={field.state.value}
-                                                    onValueChange={(value) => {
-                                                        const category =
-                                                            categories.find(
-                                                                (item) =>
-                                                                    String(
-                                                                        item.id,
-                                                                    ) ===
-                                                                    value,
-                                                            );
-                                                        field.handleChange(
+                                    <div className="grid gap-2">
+                                        <Label>Kategori</Label>
+                                        <Select
+                                            value={
+                                                form.data.expense_category_id
+                                            }
+                                            onValueChange={(value) => {
+                                                const category =
+                                                    categories.find(
+                                                        (item) =>
+                                                            String(item.id) ===
                                                             value,
-                                                        );
-                                                        form.setFieldValue(
-                                                            'is_routine',
-                                                            category?.is_routine ??
-                                                                false,
-                                                        );
-                                                    }}
-                                                >
-                                                    <SelectTrigger className="w-full">
-                                                        <SelectValue placeholder="Pilih kategori" />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        {sortedCategories.map(
-                                                            (category) => (
-                                                                <SelectItem
-                                                                    key={
-                                                                        category.id
-                                                                    }
-                                                                    value={String(
-                                                                        category.id,
-                                                                    )}
-                                                                >
-                                                                    {
-                                                                        category.name
-                                                                    }
-                                                                </SelectItem>
-                                                            ),
-                                                        )}
-                                                    </SelectContent>
-                                                </Select>
-                                                <FieldError
-                                                    errors={
-                                                        field.state.meta.errors
-                                                    }
-                                                />
-                                            </div>
-                                        )}
-                                    </form.Field>
-                                    <form.Field
-                                        name="spent_at"
-                                        validators={{
-                                            onBlur: requiredField('Tanggal'),
-                                            onChange: requiredField('Tanggal'),
-                                        }}
-                                    >
-                                        {(field) => (
-                                            <div className="grid gap-2">
-                                                <Label htmlFor={field.name}>
-                                                    Tanggal
-                                                </Label>
-                                                <Input
-                                                    id={field.name}
-                                                    type="date"
-                                                    value={field.state.value}
-                                                    onBlur={field.handleBlur}
-                                                    onChange={(event) =>
-                                                        field.handleChange(
-                                                            event.target.value,
-                                                        )
-                                                    }
-                                                />
-                                                <FieldError
-                                                    errors={
-                                                        field.state.meta.errors
-                                                    }
-                                                />
-                                            </div>
-                                        )}
-                                    </form.Field>
-                                    <form.Field
-                                        name="amount"
-                                        validators={{
-                                            onBlur: requiredField('Nominal'),
-                                            onChange: requiredField('Nominal'),
-                                        }}
-                                    >
-                                        {(field) => (
-                                            <div className="grid gap-2">
-                                                <Label htmlFor={field.name}>
-                                                    Nominal
-                                                </Label>
-                                                <Input
-                                                    id={field.name}
-                                                    type="number"
-                                                    value={field.state.value}
-                                                    onBlur={field.handleBlur}
-                                                    onChange={(event) =>
-                                                        field.handleChange(
-                                                            event.target.value,
-                                                        )
-                                                    }
-                                                />
-                                                <FieldError
-                                                    errors={
-                                                        field.state.meta.errors
-                                                    }
-                                                />
-                                            </div>
-                                        )}
-                                    </form.Field>
-                                    <form.Field
-                                        name="description"
-                                        validators={{
-                                            onBlur: requiredField('Keterangan'),
-                                            onChange:
-                                                requiredField('Keterangan'),
-                                        }}
-                                    >
-                                        {(field) => (
-                                            <div className="grid gap-2">
-                                                <Label htmlFor={field.name}>
-                                                    Keterangan
-                                                </Label>
-                                                <Input
-                                                    id={field.name}
-                                                    value={field.state.value}
-                                                    onBlur={field.handleBlur}
-                                                    onChange={(event) =>
-                                                        field.handleChange(
-                                                            event.target.value,
-                                                        )
-                                                    }
-                                                />
-                                                <FieldError
-                                                    errors={
-                                                        field.state.meta.errors
-                                                    }
-                                                />
-                                            </div>
-                                        )}
-                                    </form.Field>
+                                                    );
+                                                form.setData(
+                                                    'expense_category_id',
+                                                    value,
+                                                );
+                                                form.setData(
+                                                    'is_routine',
+                                                    category?.is_routine ??
+                                                        false,
+                                                );
+                                            }}
+                                        >
+                                            <SelectTrigger className="w-full">
+                                                <SelectValue placeholder="Pilih kategori" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {sortedCategories.map(
+                                                    (category) => (
+                                                        <SelectItem
+                                                            key={category.id}
+                                                            value={String(
+                                                                category.id,
+                                                            )}
+                                                        >
+                                                            {category.name}
+                                                        </SelectItem>
+                                                    ),
+                                                )}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="spent_at">
+                                            Tanggal
+                                        </Label>
+                                        <Input
+                                            id="spent_at"
+                                            type="datetime-local"
+                                            value={form.data.spent_at}
+                                            onChange={(event) =>
+                                                form.setData(
+                                                    'spent_at',
+                                                    event.target.value,
+                                                )
+                                            }
+                                            required
+                                        />
+                                    </div>
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="amount">Nominal</Label>
+                                        <Input
+                                            id="amount"
+                                            type="number"
+                                            value={form.data.amount}
+                                            onChange={(event) =>
+                                                form.setData(
+                                                    'amount',
+                                                    event.target.value,
+                                                )
+                                            }
+                                            required
+                                        />
+                                    </div>
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="description">
+                                            Keterangan
+                                        </Label>
+                                        <Input
+                                            id="description"
+                                            value={form.data.description}
+                                            onChange={(event) =>
+                                                form.setData(
+                                                    'description',
+                                                    event.target.value,
+                                                )
+                                            }
+                                            required
+                                        />
+                                    </div>
                                     <div className="md:col-span-2">
                                         <ImageInput
                                             name="receipt"
                                             label="Preview bukti"
                                             onFile={(file) =>
-                                                form.setFieldValue(
-                                                    'receipt',
-                                                    file,
-                                                )
+                                                form.setData('receipt', file)
                                             }
                                         />
                                     </div>
                                 </div>
                                 <DialogFooter>
-                                    <form.Subscribe
-                                        selector={(state) => ({
-                                            canSubmit: state.canSubmit,
-                                            isSubmitting: state.isSubmitting,
-                                        })}
+                                    <Button
+                                        type="submit"
+                                        disabled={form.processing}
                                     >
-                                        {({ canSubmit, isSubmitting }) => (
-                                            <Button
-                                                type="submit"
-                                                disabled={
-                                                    !canSubmit ||
-                                                    isSubmitting ||
-                                                    processing
-                                                }
-                                            >
-                                                {processing
-                                                    ? 'Menyimpan...'
-                                                    : 'Simpan'}
-                                            </Button>
-                                        )}
-                                    </form.Subscribe>
+                                        {form.processing
+                                            ? 'Menyimpan...'
+                                            : 'Simpan'}
+                                    </Button>
                                 </DialogFooter>
                             </form>
                         </DialogContent>
@@ -498,7 +414,10 @@ export default function ExpensesIndex({
                                 )}
                             </TableBody>
                         </Table>
-                        <Pagination links={expenses.links} />
+                        <Pagination
+                            links={expenses.links}
+                            perPage={expenses.per_page}
+                        />
                     </CardContent>
                 </Card>
                 {detail && (

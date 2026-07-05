@@ -21,6 +21,7 @@ class ResidentController extends Controller
             'search' => $request->string('search')->toString(),
             'resident_status' => $request->string('resident_status')->toString(),
             'marital_status' => $request->string('marital_status')->toString(),
+            'per_page' => (string) $this->perPage($request),
         ];
 
         $residents = Resident::query()
@@ -32,7 +33,7 @@ class ResidentController extends Controller
             ->when($filters['resident_status'] !== '', fn ($query) => $query->where('resident_status', $filters['resident_status']))
             ->when($filters['marital_status'] !== '', fn ($query) => $query->where('marital_status', $filters['marital_status']))
             ->latest()
-            ->paginate(12)
+            ->paginate($this->perPage($request))
             ->withQueryString();
         $residents->through(function (Resident $resident): Resident {
             $resident->setAttribute(

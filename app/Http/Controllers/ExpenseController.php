@@ -6,6 +6,7 @@ use App\Http\Requests\StoreExpenseRequest;
 use App\Http\Requests\UpdateExpenseRequest;
 use App\Models\Expense;
 use App\Models\ExpenseCategory;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -19,6 +20,7 @@ class ExpenseController extends Controller
             'month' => (int) $request->integer('month', now()->month),
             'year' => (int) $request->integer('year', now()->year),
             'category_id' => $request->string('category_id')->toString(),
+            'per_page' => (string) $this->perPage($request),
         ];
 
         return Inertia::render('expenses/index', [
@@ -29,7 +31,7 @@ class ExpenseController extends Controller
                 ->whereMonth('spent_at', $filters['month'])
                 ->when($filters['category_id'] !== '', fn ($query) => $query->where('expense_category_id', $filters['category_id']))
                 ->latest('spent_at')
-                ->paginate(12)
+                ->paginate($this->perPage($request))
                 ->withQueryString(),
             'categories' => ExpenseCategory::orderBy('name')->get(['id', 'name', 'is_routine']),
         ]);
@@ -38,6 +40,7 @@ class ExpenseController extends Controller
     public function store(StoreExpenseRequest $request): RedirectResponse
     {
         $data = $request->validated();
+        $data['spent_at'] = CarbonImmutable::parse((string) $data['spent_at'])->toDateTimeString();
 
         if ($request->hasFile('receipt')) {
             $data['receipt_path'] = $request->file('receipt')->store('expense-receipts');
@@ -58,6 +61,7 @@ class ExpenseController extends Controller
     public function update(UpdateExpenseRequest $request, Expense $expense): RedirectResponse
     {
         $data = $request->validated();
+        $data['spent_at'] = CarbonImmutable::parse((string) $data['spent_at'])->toDateTimeString();
 
         if ($request->hasFile('receipt')) {
             $data['receipt_path'] = $request->file('receipt')->store('expense-receipts');

@@ -1,13 +1,11 @@
-import { Head, router } from '@inertiajs/react';
-import {
-    useForm as useTanStackForm,
-    useStore,
-} from '@tanstack/react-form';
+import { Head, router, useForm } from '@inertiajs/react';
 import { Plus, RefreshCw } from 'lucide-react';
+import type { FormEvent } from 'react';
 import { useMemo, useState } from 'react';
 import BillGenerationController from '@/actions/App/Http/Controllers/BillGenerationController';
 import {
     destroy,
+    index,
     store,
 } from '@/actions/App/Http/Controllers/PaymentController';
 import { Button } from '@/components/ui/button';
@@ -42,17 +40,15 @@ import {
     ConfirmDeleteButton,
     DetailDialog,
     EmptyRow,
-    FieldError,
-    compareSortValue,
     formatWibDateTime,
-    monthName,
     money,
     nextSort,
     Pagination,
     period,
-    requiredField,
     SortableTableHead,
     StatusBadge,
+    compareSortValue,
+    useLocalPagination,
 } from '../rt-finance/shared';
 
 type FeeType = { id: number; name: string; amount: number };
@@ -127,7 +123,7 @@ function paymentFormDefaults(filters: {
         house_id: '',
         resident_id: '',
         fee_type_id: '',
-        paid_at: new Date().toISOString().slice(0, 10),
+        paid_at: nowLocalDateTime(),
         period_month: String(filters.month),
         period_year: String(filters.year),
         months_paid: '1',
@@ -135,6 +131,13 @@ function paymentFormDefaults(filters: {
         payment_method: '',
         notes: '',
     };
+}
+
+function nowLocalDateTime(): string {
+    const date = new Date();
+    const pad = (value: number) => String(value).padStart(2, '0');
+
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
 function generateFormDefaults(filters: {
@@ -160,7 +163,7 @@ export default function PaymentsIndex({
     houses: House[];
     residents: Resident[];
     feeTypes: FeeType[];
-    filters: { month: number; year: number; status: string };
+    filters: { month: number; year: number; status: string; per_page: string };
 }) {
     const [open, setOpen] = useState(false);
     const [generateOpen, setGenerateOpen] = useState(false);
@@ -175,31 +178,13 @@ export default function PaymentsIndex({
         key: 'paid_at',
         direction: 'desc',
     });
-    const [paymentProcessing, setPaymentProcessing] = useState(false);
-    const [generateProcessing, setGenerateProcessing] = useState(false);
-    const form = useTanStackForm({
-        defaultValues: paymentFormDefaults(filters),
-        onSubmit: ({ value }) => submit(value),
-    });
-    const generateForm = useTanStackForm({
-        defaultValues: generateFormDefaults(filters),
-        onSubmit: ({ value }) => submitGenerate(value),
-    });
-    const selectedHouseId = useStore(
-        form.store,
-        (state) => state.values.house_id,
+    const form = useForm<PaymentFormData>(paymentFormDefaults(filters));
+    const generateForm = useForm<GenerateFormData>(
+        generateFormDefaults(filters),
     );
     const selectedHouse = useMemo(
-        () => houses.find((house) => String(house.id) === selectedHouseId),
-        [houses, selectedHouseId],
-    );
-    const monthOptions = useMemo(
-        () =>
-            Array.from({ length: 12 }, (_, index) => ({
-                value: String(index + 1),
-                label: monthName(index + 1),
-            })),
-        [],
+        () => houses.find((house) => String(house.id) === form.data.house_id),
+        [houses, form.data.house_id],
     );
     const combinedBills = useMemo(() => {
         const rows = new Map<string, CombinedBill>();
@@ -265,6 +250,7 @@ export default function PaymentsIndex({
             return billSort.direction === 'asc' ? result : -result;
         });
     }, [billSort, bills]);
+    const paginatedBills = useLocalPagination(combinedBills);
     const sortedPayments = useMemo(() => {
         return [...payments.data].sort((a, b) => {
             const values: Record<PaymentSortKey, string | number> = {
@@ -292,42 +278,40 @@ export default function PaymentsIndex({
         });
     }, [payments.data, paymentSort]);
 
-    function submit(value: PaymentFormData) {
-        router.post(store.url(), value, {
+    function submit(event: FormEvent) {
+        event.preventDefault();
+
+        form.post(store.url(), {
             preserveScroll: true,
-            onStart: () => setPaymentProcessing(true),
-            onFinish: () => setPaymentProcessing(false),
             onSuccess: () => setOpen(false),
         });
     }
 
-    function submitGenerate(value: GenerateFormData) {
-        router.post(BillGenerationController.url(), value, {
+    function submitGenerate(event: FormEvent) {
+        event.preventDefault();
+
+        generateForm.post(BillGenerationController.url(), {
             preserveScroll: true,
-            onStart: () => setGenerateProcessing(true),
-            onFinish: () => setGenerateProcessing(false),
             onSuccess: () => setGenerateOpen(false),
         });
     }
 
     function setFee(value: string) {
-        form.setFieldValue('fee_type_id', value);
+        form.setData('fee_type_id', value);
         const fee = feeTypes.find((item) => String(item.id) === value);
 
         if (fee) {
-            form.setFieldValue(
+            form.setData(
                 'amount',
-                String(
-                    fee.amount * Number(form.getFieldValue('months_paid') || 1),
-                ),
+                String(fee.amount * Number(form.data.months_paid || 1)),
             );
         }
     }
 
     function setHouse(value: string) {
-        form.setFieldValue('house_id', value);
+        form.setData('house_id', value);
         const house = houses.find((item) => String(item.id) === value);
-        form.setFieldValue(
+        form.setData(
             'resident_id',
             house?.active_occupancies[0]?.resident?.id
                 ? String(house.active_occupancies[0].resident.id)
@@ -336,9 +320,9 @@ export default function PaymentsIndex({
     }
 
     function setResident(value: string) {
-        form.setFieldValue('resident_id', value);
+        form.setData('resident_id', value);
         const resident = residents.find((item) => String(item.id) === value);
-        form.setFieldValue(
+        form.setData(
             'house_id',
             resident?.active_occupancies[0]?.house?.id
                 ? String(resident.active_occupancies[0].house.id)
@@ -358,23 +342,23 @@ export default function PaymentsIndex({
                             lunas.
                         </p>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                         <Dialog
                             open={generateOpen}
                             onOpenChange={setGenerateOpen}
                         >
                             <DialogTrigger asChild>
-                                <Button variant="outline">
+                                <Button
+                                    variant="outline"
+                                    className="w-full sm:w-auto"
+                                >
                                     <RefreshCw className="size-4" />
                                     Buat tagihan periode
                                 </Button>
                             </DialogTrigger>
                             <DialogContent>
                                 <form
-                                    onSubmit={(event) => {
-                                        event.preventDefault();
-                                        void generateForm.handleSubmit();
-                                    }}
+                                    onSubmit={submitGenerate}
                                     className="grid gap-4"
                                 >
                                     <DialogHeader>
@@ -387,124 +371,71 @@ export default function PaymentsIndex({
                                         sedang dihuni. Rumah kosong dilewati.
                                     </p>
                                     <div className="grid gap-3 md:grid-cols-2">
-                                        <generateForm.Field name="period_month">
-                                            {(field) => (
-                                                <div className="grid gap-2">
-                                                    <Label>Bulan</Label>
-                                                    <Select
-                                                        value={
-                                                            field.state.value
-                                                        }
-                                                        onValueChange={
-                                                            field.handleChange
-                                                        }
-                                                    >
-                                                        <SelectTrigger className="w-full">
-                                                            <SelectValue />
-                                                        </SelectTrigger>
-                                                        <SelectContent>
-                                                            {monthOptions.map(
-                                                                (month) => (
-                                                                    <SelectItem
-                                                                        key={
-                                                                            month.value
-                                                                        }
-                                                                        value={
-                                                                            month.value
-                                                                        }
-                                                                    >
-                                                                        {
-                                                                            month.label
-                                                                        }
-                                                                    </SelectItem>
-                                                                ),
-                                                            )}
-                                                        </SelectContent>
-                                                    </Select>
-                                                </div>
-                                            )}
-                                        </generateForm.Field>
-                                        <generateForm.Field
-                                            name="period_year"
-                                            validators={{
-                                                onBlur: requiredField('Tahun'),
-                                                onChange:
-                                                    requiredField('Tahun'),
-                                            }}
-                                        >
-                                            {(field) => (
-                                                <div className="grid gap-2">
-                                                    <Label htmlFor={field.name}>
-                                                        Tahun
-                                                    </Label>
-                                                    <Input
-                                                        id={field.name}
-                                                        type="number"
-                                                        value={
-                                                            field.state.value
-                                                        }
-                                                        onBlur={
-                                                            field.handleBlur
-                                                        }
-                                                        onChange={(event) =>
-                                                            field.handleChange(
-                                                                event.target
-                                                                    .value,
-                                                            )
-                                                        }
-                                                    />
-                                                    <FieldError
-                                                        errors={
-                                                            field.state.meta
-                                                                .errors
-                                                        }
-                                                    />
-                                                </div>
-                                            )}
-                                        </generateForm.Field>
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="generate_month">
+                                                Bulan
+                                            </Label>
+                                            <Input
+                                                id="generate_month"
+                                                type="number"
+                                                min="1"
+                                                max="12"
+                                                value={
+                                                    generateForm.data
+                                                        .period_month
+                                                }
+                                                onChange={(event) =>
+                                                    generateForm.setData(
+                                                        'period_month',
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                required
+                                            />
+                                        </div>
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="generate_year">
+                                                Tahun
+                                            </Label>
+                                            <Input
+                                                id="generate_year"
+                                                type="number"
+                                                value={
+                                                    generateForm.data
+                                                        .period_year
+                                                }
+                                                onChange={(event) =>
+                                                    generateForm.setData(
+                                                        'period_year',
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                required
+                                            />
+                                        </div>
                                     </div>
                                     <DialogFooter>
-                                        <generateForm.Subscribe
-                                            selector={(state) => ({
-                                                canSubmit: state.canSubmit,
-                                                isSubmitting:
-                                                    state.isSubmitting,
-                                            })}
+                                        <Button
+                                            type="submit"
+                                            disabled={generateForm.processing}
                                         >
-                                            {({ canSubmit, isSubmitting }) => (
-                                                <Button
-                                                    type="submit"
-                                                    disabled={
-                                                        !canSubmit ||
-                                                        isSubmitting ||
-                                                        generateProcessing
-                                                    }
-                                                >
-                                                    {generateProcessing
-                                                        ? 'Membuat...'
-                                                        : 'Buat tagihan'}
-                                                </Button>
-                                            )}
-                                        </generateForm.Subscribe>
+                                            {generateForm.processing
+                                                ? 'Membuat...'
+                                                : 'Buat tagihan'}
+                                        </Button>
                                     </DialogFooter>
                                 </form>
                             </DialogContent>
                         </Dialog>
                         <Dialog open={open} onOpenChange={setOpen}>
                             <DialogTrigger asChild>
-                                <Button>
+                                <Button className="w-full sm:w-auto">
                                     <Plus className="size-4" />
                                     Catat pembayaran
                                 </Button>
                             </DialogTrigger>
                             <DialogContent className="sm:max-w-xl">
-                                <form
-                                    onSubmit={(event) => {
-                                        event.preventDefault();
-                                        void form.handleSubmit();
-                                    }}
-                                    className="grid gap-4"
-                                >
+                                <form onSubmit={submit} className="grid gap-4">
                                     <DialogHeader>
                                         <DialogTitle>
                                             Catat pembayaran
@@ -521,11 +452,11 @@ export default function PaymentsIndex({
                                                             | 'house'
                                                             | 'resident',
                                                     );
-                                                    form.setFieldValue(
+                                                    form.setData(
                                                         'house_id',
                                                         '',
                                                     );
-                                                    form.setFieldValue(
+                                                    form.setData(
                                                         'resident_id',
                                                         '',
                                                     );
@@ -546,481 +477,241 @@ export default function PaymentsIndex({
                                         </div>
                                         {inputMode === 'house' ? (
                                             <>
-                                                <form.Field
-                                                    name="house_id"
-                                                    validators={{
-                                                        onBlur:
-                                                            requiredField(
-                                                                'Rumah',
-                                                            ),
-                                                        onChange:
-                                                            requiredField(
-                                                                'Rumah',
-                                                            ),
-                                                    }}
-                                                >
-                                                    {(field) => (
-                                                        <div className="grid gap-2">
-                                                            <Label>Rumah</Label>
-                                                            <Select
-                                                                value={
-                                                                    field.state
-                                                                        .value
-                                                                }
-                                                                onValueChange={
-                                                                    setHouse
-                                                                }
-                                                            >
-                                                                <SelectTrigger className="w-full">
-                                                                    <SelectValue placeholder="Pilih rumah" />
-                                                                </SelectTrigger>
-                                                                <SelectContent>
-                                                                    {houses.map(
-                                                                        (
-                                                                            house,
-                                                                        ) => (
-                                                                            <SelectItem
-                                                                                key={
-                                                                                    house.id
-                                                                                }
-                                                                                value={String(
-                                                                                    house.id,
-                                                                                )}
-                                                                            >
-                                                                                {
-                                                                                    house.number
-                                                                                }
-                                                                            </SelectItem>
-                                                                        ),
-                                                                    )}
-                                                                </SelectContent>
-                                                            </Select>
-                                                            <FieldError
-                                                                errors={
-                                                                    field.state
-                                                                        .meta
-                                                                        .errors
-                                                                }
-                                                            />
-                                                        </div>
-                                                    )}
-                                                </form.Field>
-                                                <form.Field
-                                                    name="resident_id"
-                                                    validators={{
-                                                        onBlur:
-                                                            requiredField(
-                                                                'Penghuni',
-                                                            ),
-                                                        onChange:
-                                                            requiredField(
-                                                                'Penghuni',
-                                                            ),
-                                                    }}
-                                                >
-                                                    {(field) => (
-                                                        <div className="grid gap-2">
-                                                            <Label>
-                                                                Penghuni
-                                                            </Label>
-                                                            <Select
-                                                                value={
-                                                                    field.state
-                                                                        .value
-                                                                }
-                                                                onValueChange={
-                                                                    field.handleChange
-                                                                }
-                                                            >
-                                                                <SelectTrigger className="w-full">
-                                                                    <SelectValue placeholder="Pilih penghuni" />
-                                                                </SelectTrigger>
-                                                                <SelectContent>
-                                                                    {selectedHouse?.active_occupancies.map(
-                                                                        (
-                                                                            item,
-                                                                        ) =>
-                                                                            item.resident && (
-                                                                                <SelectItem
-                                                                                    key={
-                                                                                        item
-                                                                                            .resident
-                                                                                            .id
-                                                                                    }
-                                                                                    value={String(
-                                                                                        item
-                                                                                            .resident
-                                                                                            .id,
-                                                                                    )}
-                                                                                >
-                                                                                    {
-                                                                                        item
-                                                                                            .resident
-                                                                                            .name
-                                                                                    }
-                                                                                </SelectItem>
-                                                                            ),
-                                                                    )}
-                                                                </SelectContent>
-                                                            </Select>
-                                                            <FieldError
-                                                                errors={
-                                                                    field.state
-                                                                        .meta
-                                                                        .errors
-                                                                }
-                                                            />
-                                                        </div>
-                                                    )}
-                                                </form.Field>
-                                            </>
-                                        ) : (
-                                            <form.Field
-                                                name="resident_id"
-                                                validators={{
-                                                    onBlur:
-                                                        requiredField(
-                                                            'Nama penghuni',
-                                                        ),
-                                                    onChange:
-                                                        requiredField(
-                                                            'Nama penghuni',
-                                                        ),
-                                                }}
-                                            >
-                                                {(field) => (
-                                                    <div className="grid gap-2 md:col-span-2">
-                                                        <Label>
-                                                            Nama penghuni
-                                                        </Label>
-                                                        <Select
-                                                            value={
-                                                                field.state
-                                                                    .value
-                                                            }
-                                                            onValueChange={
-                                                                setResident
-                                                            }
-                                                        >
-                                                            <SelectTrigger className="w-full">
-                                                                <SelectValue placeholder="Pilih penghuni" />
-                                                            </SelectTrigger>
-                                                            <SelectContent>
-                                                                {residents.map(
-                                                                    (
-                                                                        resident,
-                                                                    ) => (
-                                                                        <SelectItem
-                                                                            key={
-                                                                                resident.id
-                                                                            }
-                                                                            value={String(
-                                                                                resident.id,
-                                                                            )}
-                                                                        >
-                                                                            {
-                                                                                resident.name
-                                                                            }{' '}
-                                                                            -{' '}
-                                                                            {resident
-                                                                                .active_occupancies[0]
-                                                                                ?.house
-                                                                                ?.number ??
-                                                                                '-'}
-                                                                        </SelectItem>
-                                                                    ),
-                                                                )}
-                                                            </SelectContent>
-                                                        </Select>
-                                                        <FieldError
-                                                            errors={
-                                                                field.state.meta
-                                                                    .errors
-                                                            }
-                                                        />
-                                                    </div>
-                                                )}
-                                            </form.Field>
-                                        )}
-                                        <form.Field
-                                            name="fee_type_id"
-                                            validators={{
-                                                onBlur:
-                                                    requiredField(
-                                                        'Jenis iuran',
-                                                    ),
-                                                onChange:
-                                                    requiredField(
-                                                        'Jenis iuran',
-                                                    ),
-                                            }}
-                                        >
-                                            {(field) => (
                                                 <div className="grid gap-2">
-                                                    <Label>Jenis iuran</Label>
+                                                    <Label>Rumah</Label>
                                                     <Select
                                                         value={
-                                                            field.state.value
+                                                            form.data.house_id
                                                         }
-                                                        onValueChange={setFee}
+                                                        onValueChange={setHouse}
                                                     >
                                                         <SelectTrigger className="w-full">
-                                                            <SelectValue placeholder="Pilih iuran" />
+                                                            <SelectValue placeholder="Pilih rumah" />
                                                         </SelectTrigger>
                                                         <SelectContent>
-                                                            {feeTypes.map(
-                                                                (feeType) => (
+                                                            {houses.map(
+                                                                (house) => (
                                                                     <SelectItem
                                                                         key={
-                                                                            feeType.id
+                                                                            house.id
                                                                         }
                                                                         value={String(
-                                                                            feeType.id,
+                                                                            house.id,
                                                                         )}
                                                                     >
                                                                         {
-                                                                            feeType.name
+                                                                            house.number
                                                                         }
                                                                     </SelectItem>
                                                                 ),
                                                             )}
                                                         </SelectContent>
                                                     </Select>
-                                                    <FieldError
-                                                        errors={
-                                                            field.state.meta
-                                                                .errors
-                                                        }
-                                                    />
                                                 </div>
-                                            )}
-                                        </form.Field>
-                                        <form.Field
-                                            name="paid_at"
-                                            validators={{
-                                                onBlur:
-                                                    requiredField(
-                                                        'Tanggal bayar',
-                                                    ),
-                                                onChange:
-                                                    requiredField(
-                                                        'Tanggal bayar',
-                                                    ),
-                                            }}
-                                        >
-                                            {(field) => (
                                                 <div className="grid gap-2">
-                                                    <Label htmlFor={field.name}>
-                                                        Tanggal bayar
-                                                    </Label>
-                                                    <Input
-                                                        id={field.name}
-                                                        type="date"
-                                                        value={
-                                                            field.state.value
-                                                        }
-                                                        onBlur={
-                                                            field.handleBlur
-                                                        }
-                                                        onChange={(event) =>
-                                                            field.handleChange(
-                                                                event.target
-                                                                    .value,
-                                                            )
-                                                        }
-                                                    />
-                                                    <FieldError
-                                                        errors={
-                                                            field.state.meta
-                                                                .errors
-                                                        }
-                                                    />
-                                                </div>
-                                            )}
-                                        </form.Field>
-                                        <form.Field name="period_month">
-                                            {(field) => (
-                                                <div className="grid gap-2">
-                                                    <Label>Bulan mulai</Label>
+                                                    <Label>Penghuni</Label>
                                                     <Select
                                                         value={
-                                                            field.state.value
+                                                            form.data
+                                                                .resident_id
                                                         }
-                                                        onValueChange={
-                                                            field.handleChange
+                                                        onValueChange={(
+                                                            value,
+                                                        ) =>
+                                                            form.setData(
+                                                                'resident_id',
+                                                                value,
+                                                            )
                                                         }
                                                     >
                                                         <SelectTrigger className="w-full">
-                                                            <SelectValue />
+                                                            <SelectValue placeholder="Pilih penghuni" />
                                                         </SelectTrigger>
                                                         <SelectContent>
-                                                            {monthOptions.map(
-                                                                (month) => (
-                                                                    <SelectItem
-                                                                        key={
-                                                                            month.value
-                                                                        }
-                                                                        value={
-                                                                            month.value
-                                                                        }
-                                                                    >
-                                                                        {
-                                                                            month.label
-                                                                        }
-                                                                    </SelectItem>
-                                                                ),
+                                                            {selectedHouse?.active_occupancies.map(
+                                                                (item, index) =>
+                                                                    item.resident && (
+                                                                        <SelectItem
+                                                                            key={`${item.resident.id}-${index}`}
+                                                                            value={String(
+                                                                                item
+                                                                                    .resident
+                                                                                    .id,
+                                                                            )}
+                                                                        >
+                                                                            {
+                                                                                item
+                                                                                    .resident
+                                                                                    .name
+                                                                            }
+                                                                        </SelectItem>
+                                                                    ),
                                                             )}
                                                         </SelectContent>
                                                     </Select>
                                                 </div>
-                                            )}
-                                        </form.Field>
-                                        <form.Field
-                                            name="period_year"
-                                            validators={{
-                                                onBlur: requiredField('Tahun'),
-                                                onChange:
-                                                    requiredField('Tahun'),
-                                            }}
-                                        >
-                                            {(field) => (
-                                                <div className="grid gap-2">
-                                                    <Label htmlFor={field.name}>
-                                                        Tahun
-                                                    </Label>
-                                                    <Input
-                                                        id={field.name}
-                                                        type="number"
-                                                        value={
-                                                            field.state.value
-                                                        }
-                                                        onBlur={
-                                                            field.handleBlur
-                                                        }
-                                                        onChange={(event) =>
-                                                            field.handleChange(
-                                                                event.target
-                                                                    .value,
-                                                            )
-                                                        }
-                                                    />
-                                                    <FieldError
-                                                        errors={
-                                                            field.state.meta
-                                                                .errors
-                                                        }
-                                                    />
-                                                </div>
-                                            )}
-                                        </form.Field>
-                                        <form.Field
-                                            name="months_paid"
-                                            validators={{
-                                                onBlur:
-                                                    requiredField(
-                                                        'Jumlah bulan',
-                                                    ),
-                                                onChange:
-                                                    requiredField(
-                                                        'Jumlah bulan',
-                                                    ),
-                                            }}
-                                        >
-                                            {(field) => (
-                                                <div className="grid gap-2">
-                                                    <Label htmlFor={field.name}>
-                                                        Jumlah bulan
-                                                    </Label>
-                                                    <Input
-                                                        id={field.name}
-                                                        type="number"
-                                                        min="1"
-                                                        max="12"
-                                                        value={
-                                                            field.state.value
-                                                        }
-                                                        onBlur={
-                                                            field.handleBlur
-                                                        }
-                                                        onChange={(event) =>
-                                                            field.handleChange(
-                                                                event.target
-                                                                    .value,
-                                                            )
-                                                        }
-                                                    />
-                                                    <FieldError
-                                                        errors={
-                                                            field.state.meta
-                                                                .errors
-                                                        }
-                                                    />
-                                                </div>
-                                            )}
-                                        </form.Field>
-                                        <form.Field
-                                            name="amount"
-                                            validators={{
-                                                onBlur:
-                                                    requiredField('Nominal'),
-                                                onChange:
-                                                    requiredField('Nominal'),
-                                            }}
-                                        >
-                                            {(field) => (
-                                                <div className="grid gap-2">
-                                                    <Label htmlFor={field.name}>
-                                                        Nominal
-                                                    </Label>
-                                                    <Input
-                                                        id={field.name}
-                                                        type="number"
-                                                        value={
-                                                            field.state.value
-                                                        }
-                                                        onBlur={
-                                                            field.handleBlur
-                                                        }
-                                                        onChange={(event) =>
-                                                            field.handleChange(
-                                                                event.target
-                                                                    .value,
-                                                            )
-                                                        }
-                                                    />
-                                                    <FieldError
-                                                        errors={
-                                                            field.state.meta
-                                                                .errors
-                                                        }
-                                                    />
-                                                </div>
-                                            )}
-                                        </form.Field>
+                                            </>
+                                        ) : (
+                                            <div className="grid gap-2 md:col-span-2">
+                                                <Label>Nama penghuni</Label>
+                                                <Select
+                                                    value={
+                                                        form.data.resident_id
+                                                    }
+                                                    onValueChange={setResident}
+                                                >
+                                                    <SelectTrigger className="w-full">
+                                                        <SelectValue placeholder="Pilih penghuni" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        {residents.map(
+                                                            (resident) => (
+                                                                <SelectItem
+                                                                    key={
+                                                                        resident.id
+                                                                    }
+                                                                    value={String(
+                                                                        resident.id,
+                                                                    )}
+                                                                >
+                                                                    {
+                                                                        resident.name
+                                                                    }{' '}
+                                                                    -{' '}
+                                                                    {resident
+                                                                        .active_occupancies[0]
+                                                                        ?.house
+                                                                        ?.number ??
+                                                                        '-'}
+                                                                </SelectItem>
+                                                            ),
+                                                        )}
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                        )}
+                                        <div className="grid gap-2">
+                                            <Label>Jenis iuran</Label>
+                                            <Select
+                                                value={form.data.fee_type_id}
+                                                onValueChange={setFee}
+                                            >
+                                                <SelectTrigger className="w-full">
+                                                    <SelectValue placeholder="Pilih iuran" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {feeTypes.map((feeType) => (
+                                                        <SelectItem
+                                                            key={feeType.id}
+                                                            value={String(
+                                                                feeType.id,
+                                                            )}
+                                                        >
+                                                            {feeType.name}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="paid_at">
+                                                Tanggal bayar
+                                            </Label>
+                                            <Input
+                                                id="paid_at"
+                                                type="datetime-local"
+                                                value={form.data.paid_at}
+                                                onChange={(event) =>
+                                                    form.setData(
+                                                        'paid_at',
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                required
+                                            />
+                                        </div>
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="period_month">
+                                                Bulan mulai
+                                            </Label>
+                                            <Input
+                                                id="period_month"
+                                                type="number"
+                                                min="1"
+                                                max="12"
+                                                value={form.data.period_month}
+                                                onChange={(event) =>
+                                                    form.setData(
+                                                        'period_month',
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                required
+                                            />
+                                        </div>
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="period_year">
+                                                Tahun
+                                            </Label>
+                                            <Input
+                                                id="period_year"
+                                                type="number"
+                                                value={form.data.period_year}
+                                                onChange={(event) =>
+                                                    form.setData(
+                                                        'period_year',
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                required
+                                            />
+                                        </div>
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="months_paid">
+                                                Jumlah bulan
+                                            </Label>
+                                            <Input
+                                                id="months_paid"
+                                                type="number"
+                                                min="1"
+                                                max="12"
+                                                value={form.data.months_paid}
+                                                onChange={(event) =>
+                                                    form.setData(
+                                                        'months_paid',
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                required
+                                            />
+                                        </div>
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="amount">
+                                                Nominal
+                                            </Label>
+                                            <Input
+                                                id="amount"
+                                                type="number"
+                                                value={form.data.amount}
+                                                onChange={(event) =>
+                                                    form.setData(
+                                                        'amount',
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                required
+                                            />
+                                        </div>
                                     </div>
                                     <DialogFooter>
-                                        <form.Subscribe
-                                            selector={(state) => ({
-                                                canSubmit: state.canSubmit,
-                                                isSubmitting:
-                                                    state.isSubmitting,
-                                            })}
+                                        <Button
+                                            type="submit"
+                                            disabled={form.processing}
                                         >
-                                            {({ canSubmit, isSubmitting }) => (
-                                                <Button
-                                                    type="submit"
-                                                    disabled={
-                                                        !canSubmit ||
-                                                        isSubmitting ||
-                                                        paymentProcessing
-                                                    }
-                                                >
-                                                    {paymentProcessing
-                                                        ? 'Menyimpan...'
-                                                        : 'Simpan'}
-                                                </Button>
-                                            )}
-                                        </form.Subscribe>
+                                            {form.processing
+                                                ? 'Menyimpan...'
+                                                : 'Simpan'}
+                                        </Button>
                                     </DialogFooter>
                                 </form>
                             </DialogContent>
@@ -1030,12 +721,42 @@ export default function PaymentsIndex({
 
                 <Card>
                     <CardHeader>
-                        <CardTitle>
-                            Status tagihan {period(filters.month, filters.year)}
-                        </CardTitle>
+                        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                            <CardTitle>
+                                Status tagihan{' '}
+                                {period(filters.month, filters.year)}
+                            </CardTitle>
+                            <Select
+                                value={filters.status}
+                                onValueChange={(value) =>
+                                    router.get(
+                                        index.url(),
+                                        { ...filters, status: value },
+                                        {
+                                            preserveState: true,
+                                            preserveScroll: true,
+                                        },
+                                    )
+                                }
+                            >
+                                <SelectTrigger className="w-full sm:w-48">
+                                    <SelectValue placeholder="Semua status" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="">Semua</SelectItem>
+                                    <SelectItem value="belum_lunas">
+                                        Belum lunas
+                                    </SelectItem>
+                                    <SelectItem value="sebagian">
+                                        Sebagian
+                                    </SelectItem>
+                                    <SelectItem value="lunas">Lunas</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
                     </CardHeader>
                     <CardContent className="grid gap-3">
-                        <Table>
+                        <Table className="min-w-[720px]">
                             <TableHeader>
                                 <TableRow>
                                     <SortableTableHead
@@ -1100,7 +821,7 @@ export default function PaymentsIndex({
                                 {combinedBills.length === 0 ? (
                                     <EmptyRow colSpan={6} />
                                 ) : (
-                                    combinedBills.map((bill) => (
+                                    paginatedBills.data.map((bill) => (
                                         <TableRow
                                             key={bill.id}
                                             className="cursor-pointer"
@@ -1131,6 +852,7 @@ export default function PaymentsIndex({
                                 )}
                             </TableBody>
                         </Table>
+                        {combinedBills.length > 0 && paginatedBills.controls}
                     </CardContent>
                 </Card>
 
@@ -1139,7 +861,7 @@ export default function PaymentsIndex({
                         <CardTitle>Riwayat pembayaran</CardTitle>
                     </CardHeader>
                     <CardContent className="grid gap-3">
-                        <Table>
+                        <Table className="min-w-[820px]">
                             <TableHeader>
                                 <TableRow>
                                     <SortableTableHead
@@ -1269,7 +991,10 @@ export default function PaymentsIndex({
                                 )}
                             </TableBody>
                         </Table>
-                        <Pagination links={payments.links} />
+                        <Pagination
+                            links={payments.links}
+                            perPage={payments.per_page}
+                        />
                     </CardContent>
                 </Card>
 

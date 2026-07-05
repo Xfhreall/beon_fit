@@ -37,7 +37,8 @@ class FinanceSeeder extends Seeder
             'is_routine' => $category[1],
         ]));
 
-        $period = CarbonImmutable::now()->startOfMonth();
+        $now = CarbonImmutable::now();
+        $period = $now->startOfMonth();
 
         House::with('activeOccupancies.resident')
             ->where('status', 'dihuni')
@@ -64,7 +65,7 @@ class FinanceSeeder extends Seeder
                 }
             });
 
-        Bill::with(['house.activeOccupancies', 'feeType'])->limit(18)->get()->each(function (Bill $bill): void {
+        Bill::with(['house.activeOccupancies', 'feeType'])->limit(18)->get()->each(function (Bill $bill) use ($now): void {
             $residentId = $bill->resident_id ?? $bill->house->activeOccupancies->first()?->resident_id;
 
             if ($residentId === null) {
@@ -75,7 +76,7 @@ class FinanceSeeder extends Seeder
                 'house_id' => $bill->house_id,
                 'resident_id' => $residentId,
                 'fee_type_id' => $bill->fee_type_id,
-                'paid_at' => now()->toDateString(),
+                'paid_at' => $now->toDateTimeString(),
                 'period_month' => $bill->period_month,
                 'period_year' => $bill->period_year,
                 'months_paid' => 1,
@@ -94,7 +95,7 @@ class FinanceSeeder extends Seeder
 
         Expense::firstOrCreate([
             'expense_category_id' => $salary->id,
-            'spent_at' => now()->startOfMonth()->toDateString(),
+            'spent_at' => $period->setTime($now->hour, $now->minute, $now->second)->toDateTimeString(),
             'description' => 'Gaji satpam bulan berjalan',
         ], [
             'amount' => 2000000,
@@ -103,7 +104,7 @@ class FinanceSeeder extends Seeder
 
         Expense::firstOrCreate([
             'expense_category_id' => $cleaningCategory->id,
-            'spent_at' => now()->startOfMonth()->addDays(5)->toDateString(),
+            'spent_at' => $period->addDays(5)->setTime($now->hour, $now->minute, $now->second)->toDateTimeString(),
             'description' => 'Peralatan kebersihan lingkungan',
         ], [
             'amount' => 250000,

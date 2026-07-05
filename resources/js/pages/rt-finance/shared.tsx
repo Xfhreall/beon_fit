@@ -1,4 +1,4 @@
-import { router } from '@inertiajs/react';
+import { router, usePage } from '@inertiajs/react';
 import { ArrowUpDown, ImageIcon, Trash2 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
@@ -13,8 +13,14 @@ import {
     DialogTrigger,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { TableCell, TableHead, TableRow } from '@/components/ui/table';
-export { FieldError, requiredField } from '@/lib/tanstack-form';
 
 export type PaginationLink = {
     url: string | null;
@@ -28,6 +34,7 @@ export type Paginated<T> = {
     from: number | null;
     to: number | null;
     total: number;
+    per_page: number;
 };
 
 export function money(value: number): string {
@@ -50,14 +57,15 @@ export function monthName(month: number): string {
     );
 }
 
-export function formatWibDateTime(value?: string | null): string {
+export function formatWibDateTime(
+    value?: string | null,
+    dateOnly = false,
+): string {
     if (!value) {
         return '-';
     }
 
-    const date = /^\d{4}-\d{2}-\d{2}$/.test(value)
-        ? new Date(`${value}T00:00:00+07:00`)
-        : new Date(value);
+    const date = parseDateString(value, dateOnly);
 
     return (
         new Intl.DateTimeFormat('id-ID', {
@@ -73,6 +81,26 @@ export function formatWibDateTime(value?: string | null): string {
             .format(date)
             .replace(/\./g, ':') + ' WIB'
     );
+}
+
+function parseDateString(value: string, dateOnly: boolean): Date {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+        return new Date(`${value}T00:00:00+07:00`);
+    }
+
+    if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(value)) {
+        return new Date(`${value.replace(' ', 'T')}+07:00`);
+    }
+
+    const isDateOnlyIso =
+        dateOnly &&
+        /^\d{4}-\d{2}-\d{2}T00:00:00(\.\d+)?(Z|[+-]00:00)$/.test(value);
+
+    if (isDateOnlyIso) {
+        return new Date(`${value.slice(0, 10)}T00:00:00+07:00`);
+    }
+
+    return new Date(value);
 }
 
 export function StatusBadge({ value }: { value: string }) {
@@ -191,33 +219,138 @@ export function EmptyRow({
     );
 }
 
-export function Pagination({ links }: { links: PaginationLink[] }) {
+export function Pagination({
+    links,
+    perPage,
+    perPageParam = 'per_page',
+    pageParam = 'page',
+}: {
+    links: PaginationLink[];
+    perPage?: number | string;
+    perPageParam?: string;
+    pageParam?: string;
+}) {
+    const page = usePage();
     const visibleLinks = links.filter(
         (link) => !['&laquo; Previous', 'Next &raquo;'].includes(link.label),
     );
 
-    if (visibleLinks.length <= 1) {
+    if (visibleLinks.length <= 1 && !perPage) {
         return null;
     }
 
+    function setPerPage(value: string) {
+        const url = new URL(
+            page.url,
+            typeof window !== 'undefined'
+                ? window.location.origin
+                : 'http://localhost',
+        );
+        url.searchParams.set(perPageParam, value);
+        url.searchParams.delete(pageParam);
+
+        router.visit(`${url.pathname}${url.search}`, {
+            preserveScroll: true,
+            preserveState: true,
+        });
+    }
+
     return (
-        <div className="flex items-center justify-end gap-1">
-            {visibleLinks.map((link, index) => (
-                <Button
-                    key={`${link.label}-${index}`}
-                    size="sm"
-                    variant={link.active ? 'default' : 'outline'}
-                    disabled={!link.url}
-                    onClick={() =>
-                        link.url &&
-                        router.visit(link.url, { preserveScroll: true })
-                    }
-                >
-                    {link.label}
-                </Button>
-            ))}
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            {perPage && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <span>Tampilkan</span>
+                    <Select value={String(perPage)} onValueChange={setPerPage}>
+                        <SelectTrigger size="sm" className="w-20">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {[10, 25, 50, 100].map((size) => (
+                                <SelectItem key={size} value={String(size)}>
+                                    {size}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                    <span>baris</span>
+                </div>
+            )}
+            <div className="flex items-center justify-end gap-1">
+                {visibleLinks.map((link, index) => (
+                    <Button
+                        key={`${link.label}-${index}`}
+                        size="sm"
+                        variant={link.active ? 'default' : 'outline'}
+                        disabled={!link.url}
+                        onClick={() =>
+                            link.url &&
+                            router.visit(link.url, {
+                                preserveScroll: true,
+                                preserveState: true,
+                            })
+                        }
+                    >
+                        {link.label}
+                    </Button>
+                ))}
+            </div>
         </div>
     );
+}
+
+export function useLocalPagination<T>(items: T[], perPage = 10) {
+    const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(perPage);
+    const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
+    const safePage = Math.min(page, totalPages);
+    const start = (safePage - 1) * pageSize;
+
+    return {
+        page: safePage,
+        pageSize,
+        totalPages,
+        data: items.slice(start, start + pageSize),
+        controls: (
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <span>Tampilkan</span>
+                    <Select
+                        value={String(pageSize)}
+                        onValueChange={(value) => {
+                            setPage(1);
+                            setPageSize(Number(value));
+                        }}
+                    >
+                        <SelectTrigger size="sm" className="w-20">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {[10, 25, 50, 100].map((size) => (
+                                <SelectItem key={size} value={String(size)}>
+                                    {size}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                    <span>baris</span>
+                </div>
+                <div className="flex justify-end gap-1">
+                    {Array.from({ length: totalPages }, (_, index) => (
+                        <Button
+                            key={index + 1}
+                            size="sm"
+                            variant={
+                                index + 1 === safePage ? 'default' : 'outline'
+                            }
+                            onClick={() => setPage(index + 1)}
+                        >
+                            {index + 1}
+                        </Button>
+                    ))}
+                </div>
+            </div>
+        ),
+    };
 }
 
 export function DebouncedSearchInput({
@@ -308,42 +441,53 @@ export function ConfirmDeleteButton({
     const [open, setOpen] = useState(false);
 
     return (
-        <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-                <Button
-                    size="icon-sm"
-                    variant="ghost"
-                    disabled={disabled}
-                    onClick={(event) => event.stopPropagation()}
-                    onPointerDown={(event) => event.stopPropagation()}
-                >
-                    <Trash2 className="size-4" />
-                </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-sm">
-                <DialogHeader>
-                    <DialogTitle>{title}</DialogTitle>
-                    <p className="text-sm text-muted-foreground">
-                        {description}
-                    </p>
-                </DialogHeader>
-                <DialogFooter>
-                    <Button variant="outline" onClick={() => setOpen(false)}>
-                        Batal
-                    </Button>
+        <div
+            onClick={(event) => event.stopPropagation()}
+            onPointerDown={(event) => event.stopPropagation()}
+        >
+            <Dialog open={open} onOpenChange={setOpen}>
+                <DialogTrigger asChild>
                     <Button
-                        variant="destructive"
-                        onClick={(event) => {
-                            event.stopPropagation();
-                            onConfirm();
-                            setOpen(false);
-                        }}
+                        size="icon-sm"
+                        variant="ghost"
+                        disabled={disabled}
+                        onClick={(event) => event.stopPropagation()}
+                        onPointerDown={(event) => event.stopPropagation()}
                     >
-                        Hapus
+                        <Trash2 className="size-4" />
                     </Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-sm">
+                    <DialogHeader>
+                        <DialogTitle>{title}</DialogTitle>
+                        <p className="text-sm text-muted-foreground">
+                            {description}
+                        </p>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button
+                            variant="outline"
+                            onClick={(event) => {
+                                event.stopPropagation();
+                                setOpen(false);
+                            }}
+                        >
+                            Batal
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={(event) => {
+                                event.stopPropagation();
+                                onConfirm();
+                                setOpen(false);
+                            }}
+                        >
+                            Hapus
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        </div>
     );
 }
 

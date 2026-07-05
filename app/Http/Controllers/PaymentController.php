@@ -25,6 +25,7 @@ class PaymentController extends Controller
             'month' => (int) $request->integer('month', now()->month),
             'year' => (int) $request->integer('year', now()->year),
             'status' => $request->string('status')->toString(),
+            'per_page' => (string) $this->perPage($request),
         ];
 
         return Inertia::render('payments/index', [
@@ -34,7 +35,8 @@ class PaymentController extends Controller
                 ->where('period_year', $filters['year'])
                 ->where('period_month', $filters['month'])
                 ->latest('paid_at')
-                ->paginate(12)
+                ->latest('payments.id')
+                ->paginate($this->perPage($request))
                 ->withQueryString(),
             'bills' => Bill::query()
                 ->with(['house:id,number,block', 'resident:id,name', 'feeType:id,name,amount'])
@@ -56,9 +58,12 @@ class PaymentController extends Controller
     public function store(StorePaymentRequest $request): RedirectResponse
     {
         $payment = DB::transaction(function () use ($request): Payment {
-            $this->assertResidentOccupiesHouse($request->validated());
+            $data = $request->validated();
+            $data['paid_at'] = CarbonImmutable::parse((string) $data['paid_at'])->toDateTimeString();
 
-            $payment = Payment::create($request->validated());
+            $this->assertResidentOccupiesHouse($data);
+
+            $payment = Payment::create($data);
             $this->ensureBillsExist($payment);
             $this->recalculateBills($payment);
 
@@ -73,7 +78,10 @@ class PaymentController extends Controller
     public function update(UpdatePaymentRequest $request, Payment $payment): RedirectResponse
     {
         DB::transaction(function () use ($request, $payment): void {
-            $payment->update($request->validated());
+            $data = $request->validated();
+            $data['paid_at'] = CarbonImmutable::parse((string) $data['paid_at'])->toDateTimeString();
+
+            $payment->update($data);
             $this->recalculateBills($payment);
         });
 

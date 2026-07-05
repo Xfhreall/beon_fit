@@ -1,10 +1,10 @@
 import { Head } from '@inertiajs/react';
 import { useState } from 'react';
 import {
-    Area,
-    AreaChart,
     CartesianGrid,
     Cell,
+    Line,
+    LineChart,
     Pie,
     PieChart,
     XAxis,
@@ -12,6 +12,8 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
     ChartContainer,
+    ChartLegend,
+    ChartLegendContent,
     ChartTooltip,
     ChartTooltipContent,
 } from '@/components/ui/chart';
@@ -29,8 +31,10 @@ import {
     EmptyRow,
     formatWibDateTime,
     money,
+    Pagination,
     period,
 } from '../rt-finance/shared';
+import type { Paginated } from '../rt-finance/shared';
 
 type Series = {
     month: string;
@@ -77,10 +81,15 @@ export default function ReportsIndex({
         accumulated_balance: number;
     };
     yearly: Series[];
-    incomeDetails: Payment[];
-    expenseDetails: Expense[];
+    incomeDetails: Paginated<Payment>;
+    expenseDetails: Paginated<Expense>;
     expenseComposition: Slice[];
-    filters: { month: number; year: number };
+    filters: {
+        month: number;
+        year: number;
+        income_per_page: string;
+        expense_per_page: string;
+    };
 }) {
     const [incomeDetail, setIncomeDetail] = useState<Payment | null>(null);
     const [expenseDetail, setExpenseDetail] = useState<Expense | null>(null);
@@ -118,47 +127,66 @@ export default function ReportsIndex({
                 <div className="grid gap-3 lg:grid-cols-3">
                     <Card className="lg:col-span-2">
                         <CardHeader>
-                            <CardTitle>Grafik tahunan</CardTitle>
+                            <CardTitle>{`Grafik tahunan semua (Januari ${filters.year} - Desember ${filters.year})`}</CardTitle>
                         </CardHeader>
-                        <CardContent>
-                            <ChartContainer
-                                config={chartConfig}
-                                className="h-72 w-full"
-                            >
-                                <AreaChart data={yearly}>
-                                    <CartesianGrid vertical={false} />
-                                    <XAxis
-                                        dataKey="month"
-                                        tickLine={false}
-                                        axisLine={false}
-                                    />
-                                    <ChartTooltip
-                                        content={<ChartTooltipContent />}
-                                    />
-                                    <Area
-                                        dataKey="income"
-                                        fill="var(--color-income)"
-                                        stroke="var(--color-income)"
-                                    />
-                                    <Area
-                                        dataKey="expense"
-                                        fill="var(--color-expense)"
-                                        stroke="var(--color-expense)"
-                                    />
-                                    <Area
-                                        dataKey="balance"
-                                        fill="var(--color-balance)"
-                                        stroke="var(--color-balance)"
-                                    />
-                                </AreaChart>
-                            </ChartContainer>
+                        <CardContent className="grid gap-3">
+                            <div className="w-full overflow-x-auto">
+                                <ChartContainer
+                                    config={chartConfig}
+                                    className="h-72 w-full min-w-[640px]"
+                                >
+                                    <LineChart data={yearly}>
+                                        <CartesianGrid vertical={false} />
+                                        <XAxis
+                                            dataKey="month"
+                                            tickLine={false}
+                                            axisLine={false}
+                                        />
+                                        <ChartTooltip
+                                            content={<ChartTooltipContent />}
+                                        />
+                                        <ChartLegend
+                                            content={
+                                                <ChartLegendContent className="flex-wrap" />
+                                            }
+                                        />
+                                        <Line
+                                            type="monotone"
+                                            dataKey="income"
+                                            name="Pemasukan"
+                                            stroke="var(--color-income)"
+                                            strokeWidth={2}
+                                            dot={{ r: 3 }}
+                                            activeDot={{ r: 5 }}
+                                        />
+                                        <Line
+                                            type="monotone"
+                                            dataKey="expense"
+                                            name="Pengeluaran"
+                                            stroke="var(--color-expense)"
+                                            strokeWidth={2}
+                                            dot={{ r: 3 }}
+                                            activeDot={{ r: 5 }}
+                                        />
+                                        <Line
+                                            type="monotone"
+                                            dataKey="balance"
+                                            name="Saldo"
+                                            stroke="var(--color-balance)"
+                                            strokeWidth={2}
+                                            dot={{ r: 3 }}
+                                            activeDot={{ r: 5 }}
+                                        />
+                                    </LineChart>
+                                </ChartContainer>
+                            </div>
                         </CardContent>
                     </Card>
                     <Card>
                         <CardHeader>
                             <CardTitle>Komposisi pengeluaran</CardTitle>
                         </CardHeader>
-                        <CardContent>
+                        <CardContent className="grid gap-3">
                             <ChartContainer
                                 config={chartConfig}
                                 className="h-72 w-full"
@@ -167,6 +195,11 @@ export default function ReportsIndex({
                                     <ChartTooltip
                                         content={
                                             <ChartTooltipContent hideLabel />
+                                        }
+                                    />
+                                    <ChartLegend
+                                        content={
+                                            <ChartLegendContent className="flex-wrap" />
                                         }
                                     />
                                     <Pie
@@ -209,10 +242,10 @@ export default function ReportsIndex({
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {incomeDetails.length === 0 ? (
+                                    {incomeDetails.data.length === 0 ? (
                                         <EmptyRow colSpan={5} />
                                     ) : (
-                                        incomeDetails.map((payment) => (
+                                        incomeDetails.data.map((payment) => (
                                             <TableRow
                                                 key={payment.id}
                                                 className="cursor-pointer"
@@ -242,6 +275,12 @@ export default function ReportsIndex({
                                     )}
                                 </TableBody>
                             </Table>
+                            <Pagination
+                                links={incomeDetails.links}
+                                perPage={incomeDetails.per_page}
+                                perPageParam="income_per_page"
+                                pageParam="income_page"
+                            />
                         </CardContent>
                     </Card>
                     <Card>
@@ -261,10 +300,10 @@ export default function ReportsIndex({
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {expenseDetails.length === 0 ? (
+                                    {expenseDetails.data.length === 0 ? (
                                         <EmptyRow colSpan={4} />
                                     ) : (
-                                        expenseDetails.map((expense) => (
+                                        expenseDetails.data.map((expense) => (
                                             <TableRow
                                                 key={expense.id}
                                                 className="cursor-pointer"
@@ -291,6 +330,12 @@ export default function ReportsIndex({
                                     )}
                                 </TableBody>
                             </Table>
+                            <Pagination
+                                links={expenseDetails.links}
+                                perPage={expenseDetails.per_page}
+                                perPageParam="expense_per_page"
+                                pageParam="expense_page"
+                            />
                         </CardContent>
                     </Card>
                 </div>

@@ -28,6 +28,7 @@ class DashboardController extends Controller
 
         return Inertia::render('dashboard', [
             'summary' => [
+                'year' => $year,
                 'total_houses' => House::count(),
                 'occupied_houses' => House::where('status', 'dihuni')->count(),
                 'vacant_houses' => House::where('status', 'tidak_dihuni')->count(),

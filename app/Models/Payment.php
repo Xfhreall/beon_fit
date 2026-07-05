@@ -21,7 +21,7 @@ class Payment extends Model
     protected function casts(): array
     {
         return [
-            'paid_at' => 'date',
+            'paid_at' => 'datetime:Y-m-d H:i:s',
             'period_month' => 'integer',
             'period_year' => 'integer',
             'months_paid' => 'integer',

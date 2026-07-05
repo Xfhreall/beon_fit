@@ -1,6 +1,6 @@
-import { Head, router } from '@inertiajs/react';
-import { useForm as useTanStackForm } from '@tanstack/react-form';
+import { Head, router, useForm } from '@inertiajs/react';
 import { Edit, Plus, UserPlus } from 'lucide-react';
+import type { FormEvent } from 'react';
 import { useMemo, useState } from 'react';
 import {
     assignResident,
@@ -53,14 +53,12 @@ import {
     DebouncedSearchInput,
     DetailDialog,
     EmptyRow,
-    FieldError,
-    compareSortValue,
     formatWibDateTime,
     nextSort,
     Pagination,
-    requiredField,
     SortableTableHead,
     StatusBadge,
+    compareSortValue,
 } from '../rt-finance/shared';
 
 type Resident = { id: number; name: string; resident_status: string };
@@ -135,16 +133,9 @@ export default function HousesIndex({
         key: 'number',
         direction: 'asc',
     });
-    const [houseProcessing, setHouseProcessing] = useState(false);
-    const [occupancyProcessing, setOccupancyProcessing] = useState(false);
-    const form = useTanStackForm({
-        defaultValues: houseFormDefaults,
-        onSubmit: ({ value }) => submitHouse(value),
-    });
-    const occupancyForm = useTanStackForm({
-        defaultValues: occupancyFormDefaults(),
-        onSubmit: ({ value }) => submitOccupancy(value),
-    });
+    const form = useForm<HouseFormData>(houseFormDefaults);
+    const occupancyForm = useForm<OccupancyFormData>(occupancyFormDefaults());
+
     const sortedHouses = useMemo(() => {
         return [...houses.data].sort((a, b) => {
             const values: Record<HouseSortKey, string | number> = {
@@ -170,39 +161,39 @@ export default function HousesIndex({
         });
     }, [houses.data, sort]);
 
-    function submitHouse(value: HouseFormData) {
+    function submit(event: FormEvent) {
+        event.preventDefault();
+
         const options = {
             preserveScroll: true,
-            onStart: () => setHouseProcessing(true),
-            onFinish: () => setHouseProcessing(false),
             onSuccess: () => setOpen(false),
         };
 
         if (editing) {
-            router.patch(update.url(editing.id), value, options);
+            form.patch(update.url(editing.id), options);
 
             return;
         }
 
-        router.post(store.url(), value, options);
+        form.post(store.url(), options);
     }
 
-    function submitOccupancy(value: OccupancyFormData) {
+    function submitOccupancy(event: FormEvent) {
+        event.preventDefault();
+
         if (!assigning) {
             return;
         }
 
-        router.post(assignResident.url(assigning.id), value, {
+        occupancyForm.post(assignResident.url(assigning.id), {
             preserveScroll: true,
-            onStart: () => setOccupancyProcessing(true),
-            onFinish: () => setOccupancyProcessing(false),
             onSuccess: () => setAssigning(null),
         });
     }
 
     function startEdit(house: House) {
         setEditing(house);
-        form.reset({
+        form.setData({
             number: house.number,
             block: house.block ?? '',
             status: house.status,
@@ -227,7 +218,7 @@ export default function HousesIndex({
                             <Button
                                 onClick={() => {
                                     setEditing(null);
-                                    form.reset(houseFormDefaults);
+                                    form.reset();
                                 }}
                             >
                                 <Plus className="size-4" />
@@ -235,13 +226,7 @@ export default function HousesIndex({
                             </Button>
                         </DialogTrigger>
                         <DialogContent>
-                            <form
-                                onSubmit={(event) => {
-                                    event.preventDefault();
-                                    void form.handleSubmit();
-                                }}
-                                className="grid gap-4"
-                            >
+                            <form onSubmit={submit} className="grid gap-4">
                                 <DialogHeader>
                                     <DialogTitle>
                                         {editing
@@ -250,104 +235,66 @@ export default function HousesIndex({
                                     </DialogTitle>
                                 </DialogHeader>
                                 <div className="grid gap-3">
-                                    <form.Field
-                                        name="number"
-                                        validators={{
-                                            onBlur: requiredField(
-                                                'Nomor rumah',
-                                            ),
-                                            onChange: requiredField(
-                                                'Nomor rumah',
-                                            ),
-                                        }}
-                                    >
-                                        {(field) => (
-                                            <div className="grid gap-2">
-                                                <Label htmlFor={field.name}>
-                                                    Nomor rumah
-                                                </Label>
-                                                <Input
-                                                    id={field.name}
-                                                    value={field.state.value}
-                                                    onBlur={field.handleBlur}
-                                                    onChange={(event) =>
-                                                        field.handleChange(
-                                                            event.target.value,
-                                                        )
-                                                    }
-                                                />
-                                                <FieldError
-                                                    errors={
-                                                        field.state.meta.errors
-                                                    }
-                                                />
-                                            </div>
-                                        )}
-                                    </form.Field>
                                     <div className="grid gap-2">
-                                        <Label>Blok</Label>
-                                        <form.Field name="block">
-                                            {(field) => (
-                                                <Input
-                                                    value={field.state.value}
-                                                    onBlur={field.handleBlur}
-                                                    onChange={(event) =>
-                                                        field.handleChange(
-                                                            event.target.value,
-                                                        )
-                                                    }
-                                                />
-                                            )}
-                                        </form.Field>
+                                        <Label htmlFor="number">
+                                            Nomor rumah
+                                        </Label>
+                                        <Input
+                                            id="number"
+                                            value={form.data.number}
+                                            onChange={(event) =>
+                                                form.setData(
+                                                    'number',
+                                                    event.target.value,
+                                                )
+                                            }
+                                            required
+                                        />
                                     </div>
-                                    <form.Field name="status">
-                                        {(field) => (
-                                            <div className="grid gap-2">
-                                                <Label>Status</Label>
-                                                <Select
-                                                    value={field.state.value}
-                                                    onValueChange={
-                                                        field.handleChange
-                                                    }
-                                                >
-                                                    <SelectTrigger className="w-full">
-                                                        <SelectValue />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        <SelectItem value="dihuni">
-                                                            Dihuni
-                                                        </SelectItem>
-                                                        <SelectItem value="tidak_dihuni">
-                                                            Tidak dihuni
-                                                        </SelectItem>
-                                                    </SelectContent>
-                                                </Select>
-                                            </div>
-                                        )}
-                                    </form.Field>
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="block">Blok</Label>
+                                        <Input
+                                            id="block"
+                                            value={form.data.block}
+                                            onChange={(event) =>
+                                                form.setData(
+                                                    'block',
+                                                    event.target.value,
+                                                )
+                                            }
+                                        />
+                                    </div>
+                                    <div className="grid gap-2">
+                                        <Label>Status</Label>
+                                        <Select
+                                            value={form.data.status}
+                                            onValueChange={(value) =>
+                                                form.setData('status', value)
+                                            }
+                                        >
+                                            <SelectTrigger className="w-full">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="dihuni">
+                                                    Dihuni
+                                                </SelectItem>
+                                                <SelectItem value="tidak_dihuni">
+                                                    Tidak dihuni
+                                                </SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
                                 </div>
                                 <DialogFooter>
-                                    <form.Subscribe
-                                        selector={(state) => ({
-                                            canSubmit: state.canSubmit,
-                                            isSubmitting: state.isSubmitting,
-                                        })}
+                                    <Button
+                                        type="submit"
+                                        disabled={form.processing}
                                     >
-                                        {({ canSubmit, isSubmitting }) => (
-                                            <Button
-                                                type="submit"
-                                                disabled={
-                                                    !canSubmit ||
-                                                    isSubmitting ||
-                                                    houseProcessing
-                                                }
-                                            >
-                                                {houseProcessing
-                                                    ? 'Menyimpan...'
-                                                    : 'Simpan'}
-                                            </Button>
-                                        )}
-                                    </form.Subscribe>
+                                        {form.processing
+                                            ? 'Menyimpan...'
+                                            : 'Simpan'}
+                                    </Button>
                                 </DialogFooter>
                             </form>
                         </DialogContent>
@@ -519,7 +466,10 @@ export default function HousesIndex({
                                 )}
                             </TableBody>
                         </Table>
-                        <Pagination links={houses.links} />
+                        <Pagination
+                            links={houses.links}
+                            perPage={houses.per_page}
+                        />
                     </CardContent>
                 </Card>
 
@@ -528,138 +478,89 @@ export default function HousesIndex({
                     onOpenChange={(value) => !value && setAssigning(null)}
                 >
                     <DialogContent>
-                        <form
-                            onSubmit={(event) => {
-                                event.preventDefault();
-                                void occupancyForm.handleSubmit();
-                            }}
-                            className="grid gap-4"
-                        >
+                        <form onSubmit={submitOccupancy} className="grid gap-4">
                             <DialogHeader>
                                 <DialogTitle>Tetapkan penghuni</DialogTitle>
                             </DialogHeader>
                             <div className="grid gap-3">
-                                <occupancyForm.Field
-                                    name="resident_id"
-                                    validators={{
-                                        onBlur: requiredField('Penghuni'),
-                                        onChange: requiredField('Penghuni'),
-                                    }}
-                                >
-                                    {(field) => (
-                                        <div className="grid gap-2">
-                                            <Label>Penghuni</Label>
-                                            <Select
-                                                value={field.state.value}
-                                                onValueChange={
-                                                    field.handleChange
-                                                }
-                                            >
-                                                <SelectTrigger className="w-full">
-                                                    <SelectValue placeholder="Pilih penghuni" />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    {residents.map(
-                                                        (resident) => (
-                                                            <SelectItem
-                                                                key={
-                                                                    resident.id
-                                                                }
-                                                                value={String(
-                                                                    resident.id,
-                                                                )}
-                                                            >
-                                                                {resident.name}
-                                                            </SelectItem>
-                                                        ),
-                                                    )}
-                                                </SelectContent>
-                                            </Select>
-                                            <FieldError
-                                                errors={
-                                                    field.state.meta.errors
-                                                }
-                                            />
-                                        </div>
-                                    )}
-                                </occupancyForm.Field>
-                                <occupancyForm.Field
-                                    name="started_at"
-                                    validators={{
-                                        onBlur: requiredField('Mulai tinggal'),
-                                        onChange:
-                                            requiredField('Mulai tinggal'),
-                                    }}
-                                >
-                                    {(field) => (
-                                        <div className="grid gap-2">
-                                            <Label>Mulai tinggal</Label>
-                                            <Input
-                                                type="date"
-                                                value={field.state.value}
-                                                onBlur={field.handleBlur}
-                                                onChange={(event) =>
-                                                    field.handleChange(
-                                                        event.target.value,
-                                                    )
-                                                }
-                                            />
-                                            <FieldError
-                                                errors={
-                                                    field.state.meta.errors
-                                                }
-                                            />
-                                        </div>
-                                    )}
-                                </occupancyForm.Field>
-                                <occupancyForm.Field name="resident_status">
-                                    {(field) => (
-                                        <div className="grid gap-2">
-                                            <Label>Status saat tinggal</Label>
-                                            <Select
-                                                value={field.state.value}
-                                                onValueChange={
-                                                    field.handleChange
-                                                }
-                                            >
-                                                <SelectTrigger className="w-full">
-                                                    <SelectValue />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem value="tetap">
-                                                        Tetap
-                                                    </SelectItem>
-                                                    <SelectItem value="kontrak">
-                                                        Kontrak
-                                                    </SelectItem>
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
-                                    )}
-                                </occupancyForm.Field>
+                                <div className="grid gap-2">
+                                    <Label>Penghuni</Label>
+                                    <Select
+                                        value={occupancyForm.data.resident_id}
+                                        onValueChange={(value) =>
+                                            occupancyForm.setData(
+                                                'resident_id',
+                                                value,
+                                            )
+                                        }
+                                    >
+                                        <SelectTrigger className="w-full">
+                                            <SelectValue placeholder="Pilih penghuni" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {residents.map((resident) => (
+                                                <SelectItem
+                                                    key={resident.id}
+                                                    value={String(resident.id)}
+                                                >
+                                                    {resident.name}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="grid gap-2">
+                                    <Label htmlFor="started_at">
+                                        Mulai tinggal
+                                    </Label>
+                                    <Input
+                                        id="started_at"
+                                        type="date"
+                                        value={occupancyForm.data.started_at}
+                                        onChange={(event) =>
+                                            occupancyForm.setData(
+                                                'started_at',
+                                                event.target.value,
+                                            )
+                                        }
+                                    />
+                                </div>
+                                <div className="grid gap-2">
+                                    <Label>Status saat tinggal</Label>
+                                    <Select
+                                        value={
+                                            occupancyForm.data.resident_status
+                                        }
+                                        onValueChange={(value) =>
+                                            occupancyForm.setData(
+                                                'resident_status',
+                                                value,
+                                            )
+                                        }
+                                    >
+                                        <SelectTrigger className="w-full">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="tetap">
+                                                Tetap
+                                            </SelectItem>
+                                            <SelectItem value="kontrak">
+                                                Kontrak
+                                            </SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
                             </div>
                             <DialogFooter>
-                                <occupancyForm.Subscribe
-                                    selector={(state) => ({
-                                        canSubmit: state.canSubmit,
-                                        isSubmitting: state.isSubmitting,
-                                    })}
+                                <Button
+                                    type="submit"
+                                    disabled={occupancyForm.processing}
                                 >
-                                    {({ canSubmit, isSubmitting }) => (
-                                        <Button
-                                            type="submit"
-                                            disabled={
-                                                !canSubmit ||
-                                                isSubmitting ||
-                                                occupancyProcessing
-                                            }
-                                        >
-                                            {occupancyProcessing
-                                                ? 'Menyimpan...'
-                                                : 'Simpan'}
-                                        </Button>
-                                    )}
-                                </occupancyForm.Subscribe>
+                                    {occupancyForm.processing
+                                        ? 'Menyimpan...'
+                                        : 'Simpan'}
+                                </Button>
                             </DialogFooter>
                         </form>
                     </DialogContent>
@@ -668,7 +569,10 @@ export default function HousesIndex({
                     open={ending !== null}
                     onOpenChange={(value) => !value && setEnding(null)}
                 >
-                    <AlertDialogContent>
+                    <AlertDialogContent
+                        onClick={(event) => event.stopPropagation()}
+                        onPointerDown={(event) => event.stopPropagation()}
+                    >
                         <AlertDialogHeader>
                             <AlertDialogTitle>
                                 Akhiri masa tinggal?
@@ -680,9 +584,15 @@ export default function HousesIndex({
                             </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
-                            <AlertDialogCancel>Batal</AlertDialogCancel>
+                            <AlertDialogCancel
+                                onClick={(event) => event.stopPropagation()}
+                            >
+                                Batal
+                            </AlertDialogCancel>
                             <AlertDialogAction
-                                onClick={() => {
+                                onClick={(event) => {
+                                    event.stopPropagation();
+
                                     if (!ending) {
                                         return;
                                     }

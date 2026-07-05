@@ -21,7 +21,7 @@ class Expense extends Model
     protected function casts(): array
     {
         return [
-            'spent_at' => 'date',
+            'spent_at' => 'datetime:Y-m-d H:i:s',
             'amount' => 'integer',
             'is_routine' => 'boolean',
         ];

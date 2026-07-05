@@ -19,7 +19,12 @@ class ReportController extends Controller
         $expense = Expense::whereYear('spent_at', $year)->whereMonth('spent_at', $month)->sum('amount');
 
         return Inertia::render('reports/index', [
-            'filters' => ['month' => $month, 'year' => $year],
+            'filters' => [
+                'month' => $month,
+                'year' => $year,
+                'income_per_page' => (string) $this->perPage($request, 'income_per_page'),
+                'expense_per_page' => (string) $this->perPage($request, 'expense_per_page'),
+            ],
             'summary' => [
                 'income' => (int) $income,
                 'expense' => (int) $expense,
@@ -31,12 +36,14 @@ class ReportController extends Controller
                 ->where('period_year', $year)
                 ->where('period_month', $month)
                 ->latest('paid_at')
-                ->get(),
+                ->paginate($this->perPage($request, 'income_per_page'), ['*'], 'income_page')
+                ->withQueryString(),
             'expenseDetails' => Expense::with('category:id,name')
                 ->whereYear('spent_at', $year)
                 ->whereMonth('spent_at', $month)
                 ->latest('spent_at')
-                ->get(),
+                ->paginate($this->perPage($request, 'expense_per_page'), ['*'], 'expense_page')
+                ->withQueryString(),
             'expenseComposition' => Expense::with('category:id,name')
                 ->whereYear('spent_at', $year)
                 ->whereMonth('spent_at', $month)

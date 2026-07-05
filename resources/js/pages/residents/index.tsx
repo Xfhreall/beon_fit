@@ -1,6 +1,6 @@
-import { Head, router } from '@inertiajs/react';
-import { useForm as useTanStackForm } from '@tanstack/react-form';
+import { Head, router, useForm } from '@inertiajs/react';
 import { Edit, ImageIcon, Plus } from 'lucide-react';
+import type { FormEvent } from 'react';
 import { useMemo, useState } from 'react';
 import {
     destroy,
@@ -41,15 +41,13 @@ import {
     DebouncedSearchInput,
     DetailDialog,
     EmptyRow,
-    FieldError,
-    compareSortValue,
     formatWibDateTime,
     ImageInput,
     nextSort,
     Pagination,
-    requiredField,
     SortableTableHead,
     StatusBadge,
+    compareSortValue,
 } from '../rt-finance/shared';
 
 type Resident = {
@@ -71,6 +69,7 @@ type FormData = {
     marital_status: string;
     ktp_photo: File | null;
 };
+
 type ResidentSortKey = 'name' | 'phone' | 'status' | 'marital' | 'house';
 
 const residentFormDefaults: FormData = {
@@ -96,11 +95,8 @@ export default function ResidentsIndex({
         key: 'name',
         direction: 'asc',
     });
-    const [processing, setProcessing] = useState(false);
-    const form = useTanStackForm({
-        defaultValues: residentFormDefaults,
-        onSubmit: ({ value }) => submit(value),
-    });
+    const form = useForm<FormData>(residentFormDefaults);
+
     const sortedResidents = useMemo(() => {
         return [...residents.data].sort((a, b) => {
             const values: Record<ResidentSortKey, string | number> = {
@@ -126,27 +122,27 @@ export default function ResidentsIndex({
         });
     }, [residents.data, sort]);
 
-    function submit(value: FormData) {
+    function submit(event: FormEvent) {
+        event.preventDefault();
+
         const options = {
             forceFormData: true,
             preserveScroll: true,
-            onStart: () => setProcessing(true),
-            onFinish: () => setProcessing(false),
             onSuccess: () => setOpen(false),
         };
 
         if (editing) {
-            router.post(update.form.patch(editing.id).action, value, options);
+            form.post(update.form.patch(editing.id).action, options);
 
             return;
         }
 
-        router.post(store.url(), value, options);
+        form.post(store.url(), options);
     }
 
     function startEdit(resident: Resident) {
         setEditing(resident);
-        form.reset({
+        form.setData({
             name: resident.name,
             phone: resident.phone,
             resident_status: resident.resident_status,
@@ -158,7 +154,9 @@ export default function ResidentsIndex({
 
     function startCreate() {
         setEditing(null);
-        form.reset(residentFormDefaults);
+        form.reset();
+        form.setData('resident_status', 'tetap');
+        form.setData('marital_status', 'menikah');
         setOpen(true);
     }
 
@@ -181,13 +179,7 @@ export default function ResidentsIndex({
                             </Button>
                         </DialogTrigger>
                         <DialogContent className="sm:max-w-xl">
-                            <form
-                                onSubmit={(event) => {
-                                    event.preventDefault();
-                                    void form.handleSubmit();
-                                }}
-                                className="grid gap-4"
-                            >
+                            <form onSubmit={submit} className="grid gap-4">
                                 <DialogHeader>
                                     <DialogTitle>
                                         {editing
@@ -196,157 +188,105 @@ export default function ResidentsIndex({
                                     </DialogTitle>
                                 </DialogHeader>
                                 <div className="grid gap-3 md:grid-cols-2">
-                                    <form.Field
-                                        name="name"
-                                        validators={{
-                                            onBlur: requiredField(
-                                                'Nama lengkap',
-                                            ),
-                                            onChange:
-                                                requiredField('Nama lengkap'),
-                                        }}
-                                    >
-                                        {(field) => (
-                                            <div className="grid gap-2">
-                                                <Label htmlFor={field.name}>
-                                                    Nama lengkap
-                                                </Label>
-                                                <Input
-                                                    id={field.name}
-                                                    value={field.state.value}
-                                                    onBlur={field.handleBlur}
-                                                    onChange={(event) =>
-                                                        field.handleChange(
-                                                            event.target.value,
-                                                        )
-                                                    }
-                                                />
-                                                <FieldError
-                                                    errors={
-                                                        field.state.meta.errors
-                                                    }
-                                                />
-                                            </div>
-                                        )}
-                                    </form.Field>
-                                    <form.Field
-                                        name="phone"
-                                        validators={{
-                                            onBlur: requiredField(
-                                                'Nomor telepon',
-                                            ),
-                                            onChange:
-                                                requiredField('Nomor telepon'),
-                                        }}
-                                    >
-                                        {(field) => (
-                                            <div className="grid gap-2">
-                                                <Label htmlFor={field.name}>
-                                                    Nomor telepon
-                                                </Label>
-                                                <Input
-                                                    id={field.name}
-                                                    value={field.state.value}
-                                                    onBlur={field.handleBlur}
-                                                    onChange={(event) =>
-                                                        field.handleChange(
-                                                            event.target.value,
-                                                        )
-                                                    }
-                                                />
-                                                <FieldError
-                                                    errors={
-                                                        field.state.meta.errors
-                                                    }
-                                                />
-                                            </div>
-                                        )}
-                                    </form.Field>
-                                    <form.Field name="resident_status">
-                                        {(field) => (
-                                            <div className="grid gap-2">
-                                                <Label>Status penghuni</Label>
-                                                <Select
-                                                    value={field.state.value}
-                                                    onValueChange={
-                                                        field.handleChange
-                                                    }
-                                                >
-                                                    <SelectTrigger className="w-full">
-                                                        <SelectValue />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        <SelectItem value="tetap">
-                                                            Tetap
-                                                        </SelectItem>
-                                                        <SelectItem value="kontrak">
-                                                            Kontrak
-                                                        </SelectItem>
-                                                    </SelectContent>
-                                                </Select>
-                                            </div>
-                                        )}
-                                    </form.Field>
-                                    <form.Field name="marital_status">
-                                        {(field) => (
-                                            <div className="grid gap-2">
-                                                <Label>Status pernikahan</Label>
-                                                <Select
-                                                    value={field.state.value}
-                                                    onValueChange={
-                                                        field.handleChange
-                                                    }
-                                                >
-                                                    <SelectTrigger className="w-full">
-                                                        <SelectValue />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        <SelectItem value="menikah">
-                                                            Menikah
-                                                        </SelectItem>
-                                                        <SelectItem value="belum_menikah">
-                                                            Belum menikah
-                                                        </SelectItem>
-                                                    </SelectContent>
-                                                </Select>
-                                            </div>
-                                        )}
-                                    </form.Field>
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="name">
+                                            Nama lengkap
+                                        </Label>
+                                        <Input
+                                            id="name"
+                                            value={form.data.name}
+                                            onChange={(event) =>
+                                                form.setData(
+                                                    'name',
+                                                    event.target.value,
+                                                )
+                                            }
+                                            required
+                                        />
+                                    </div>
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="phone">
+                                            Nomor telepon
+                                        </Label>
+                                        <Input
+                                            id="phone"
+                                            value={form.data.phone}
+                                            onChange={(event) =>
+                                                form.setData(
+                                                    'phone',
+                                                    event.target.value,
+                                                )
+                                            }
+                                            required
+                                        />
+                                    </div>
+                                    <div className="grid gap-2">
+                                        <Label>Status penghuni</Label>
+                                        <Select
+                                            value={form.data.resident_status}
+                                            onValueChange={(value) =>
+                                                form.setData(
+                                                    'resident_status',
+                                                    value,
+                                                )
+                                            }
+                                        >
+                                            <SelectTrigger className="w-full">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="tetap">
+                                                    Tetap
+                                                </SelectItem>
+                                                <SelectItem value="kontrak">
+                                                    Kontrak
+                                                </SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="grid gap-2">
+                                        <Label>Status pernikahan</Label>
+                                        <Select
+                                            value={form.data.marital_status}
+                                            onValueChange={(value) =>
+                                                form.setData(
+                                                    'marital_status',
+                                                    value,
+                                                )
+                                            }
+                                        >
+                                            <SelectTrigger className="w-full">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="menikah">
+                                                    Menikah
+                                                </SelectItem>
+                                                <SelectItem value="belum_menikah">
+                                                    Belum menikah
+                                                </SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
                                     <div className="md:col-span-2">
                                         <ImageInput
                                             name="ktp_photo"
                                             label="Preview KTP"
                                             onFile={(file) =>
-                                                form.setFieldValue(
-                                                    'ktp_photo',
-                                                    file,
-                                                )
+                                                form.setData('ktp_photo', file)
                                             }
                                         />
                                     </div>
                                 </div>
                                 <DialogFooter>
-                                    <form.Subscribe
-                                        selector={(state) => ({
-                                            canSubmit: state.canSubmit,
-                                            isSubmitting: state.isSubmitting,
-                                        })}
+                                    <Button
+                                        type="submit"
+                                        disabled={form.processing}
                                     >
-                                        {({ canSubmit, isSubmitting }) => (
-                                            <Button
-                                                type="submit"
-                                                disabled={
-                                                    !canSubmit ||
-                                                    isSubmitting ||
-                                                    processing
-                                                }
-                                            >
-                                                {processing
-                                                    ? 'Menyimpan...'
-                                                    : 'Simpan'}
-                                            </Button>
-                                        )}
-                                    </form.Subscribe>
+                                        {form.processing
+                                            ? 'Menyimpan...'
+                                            : 'Simpan'}
+                                    </Button>
                                 </DialogFooter>
                             </form>
                         </DialogContent>
@@ -501,7 +441,10 @@ export default function ResidentsIndex({
                                 )}
                             </TableBody>
                         </Table>
-                        <Pagination links={residents.links} />
+                        <Pagination
+                            links={residents.links}
+                            perPage={residents.per_page}
+                        />
                     </CardContent>
                 </Card>
                 {detail && (

@@ -24,7 +24,7 @@ class PaymentFactory extends Factory
             'house_id' => House::factory(),
             'resident_id' => Resident::factory(),
             'fee_type_id' => FeeType::factory(),
-            'paid_at' => now()->toDateString(),
+            'paid_at' => now()->toDateTimeString(),
             'period_month' => now()->month,
             'period_year' => now()->year,
             'months_paid' => 1,

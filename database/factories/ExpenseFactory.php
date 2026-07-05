@@ -20,7 +20,7 @@ class ExpenseFactory extends Factory
     {
         return [
             'expense_category_id' => ExpenseCategory::factory(),
-            'spent_at' => now()->toDateString(),
+            'spent_at' => now()->toDateTimeString(),
             'amount' => fake()->numberBetween(25000, 500000),
             'description' => fake()->sentence(),
             'receipt_path' => null,
