@@ -54,15 +54,6 @@ jobs:
       - name: Generate Application Key
         run: php artisan key:generate
 
-      - name: Run Migrations
-        run: php artisan migrate
-
-      - name: Run Seeders
-        run: php artisan db:seed
-
-      - name: Run storage link
-        run: php artisan storage:link
-
       - name: Build Assets
         run: npm run build
 
