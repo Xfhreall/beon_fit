@@ -14,6 +14,8 @@ Produk mengikuti `PRD.md`:
 - Pembayaran iuran satpam dan kebersihan, termasuk pembayaran multi-bulan.
 - Pengeluaran rutin dan non-rutin dengan upload dan preview bukti.
 - Laporan bulanan dan grafik tahunan.
+- Pagination table dengan pilihan 10, 25, 50, atau 100 baris.
+- Penyimpanan dan tampilan waktu transaksi memakai jam, menit, detik WIB.
 
 Implementasi saat ini memakai Laravel + Inertia React dalam satu repository. Backend dan frontend tetap dipisahkan secara struktur: kode Laravel di `app/`, `routes/`, `database/`; kode React di `resources/js/`.
 
@@ -76,6 +78,7 @@ Seeder membuat:
 - Master iuran kebersihan Rp15.000.
 - Kategori pengeluaran awal.
 - Akun admin demo.
+- Nomor telepon penghuni demo memakai format `08`.
 
 ## Run Locally
 
@@ -137,9 +140,11 @@ UI:
 
 - Summary memakai card.
 - Detail data memakai table.
+- Table memakai pagination dengan pilihan 10, 25, 50, dan 100 baris.
 - CRUD memakai dialog atau alert dialog.
-- Chart memakai Recharts dengan pola shadcn/ui chart.
+- Chart memakai Recharts dengan pola shadcn/ui chart, legend, dan layout responsif.
 - Upload gambar menampilkan preview sebelum submit.
+- Sidebar mobile otomatis tertutup setelah menu navigasi dipilih.
 
 ## ERD
 
@@ -203,7 +208,7 @@ erDiagram
         bigint house_id FK
         bigint resident_id FK
         bigint fee_type_id FK
-        date paid_at
+        datetime paid_at
         tinyint period_month
         smallint period_year
         tinyint months_paid
@@ -221,7 +226,7 @@ erDiagram
     EXPENSES {
         bigint id PK
         bigint expense_category_id FK
-        date spent_at
+        datetime spent_at
         integer amount
         text description
         varchar receipt_path
@@ -242,6 +247,7 @@ erDiagram
 ## Verification
 
 ```bash
+vendor/bin/pint --dirty --format agent
 php artisan test --compact
 npm run lint:check
 npm run types:check
