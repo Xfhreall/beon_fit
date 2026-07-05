@@ -6,6 +6,8 @@ use App\Models\FeeType;
 use App\Models\House;
 use App\Models\Resident;
 use App\Models\User;
+use Illuminate\Support\Facades\Storage;
+use Inertia\Testing\AssertableInertia as Assert;
 
 test('dashboard is rendered with finance summary', function () {
     $this->actingAs(User::factory()->create());
@@ -90,4 +92,22 @@ test('expense can be recorded', function () {
         'expense_category_id' => $category->id,
         'amount' => 250000,
     ]);
+});
+
+test('resident ktp photo can be previewed from residents table', function () {
+    Storage::fake('local');
+    $this->actingAs(User::factory()->create());
+    Storage::disk('local')->put('resident-ktp/test.jpg', 'fake image');
+    $resident = Resident::factory()->create([
+        'ktp_photo_path' => 'resident-ktp/test.jpg',
+    ]);
+
+    $this->get(route('residents.index'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('residents/index')
+            ->where('residents.data.0.ktp_photo_url', route('residents.ktp-photo', $resident))
+        );
+
+    $this->get(route('residents.ktp-photo', $resident))->assertOk();
 });

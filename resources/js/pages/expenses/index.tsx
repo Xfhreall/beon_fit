@@ -1,7 +1,7 @@
-import { Head, router, useForm } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
+import { useForm as useTanStackForm } from '@tanstack/react-form';
 import { Plus } from 'lucide-react';
-import type { FormEvent } from 'react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
     destroy,
     store,
@@ -33,15 +33,22 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import type { Paginated } from '../rt-finance/shared';
+import type { Paginated, SortState } from '../rt-finance/shared';
 import {
     ConfirmDeleteButton,
     DetailDialog,
     EmptyRow,
+    FieldError,
+    compareSortValue,
     formatWibDateTime,
     ImageInput,
     money,
+    nextSort,
     Pagination,
+    period,
+    requiredField,
+    SortableTableHead,
+    StatusBadge,
 } from '../rt-finance/shared';
 
 type Category = { id: number; name: string; is_routine: boolean };
@@ -53,6 +60,26 @@ type Expense = {
     is_routine: boolean;
     category: Category;
 };
+type ExpenseSortKey = 'date' | 'category' | 'description' | 'type' | 'amount';
+type ExpenseFormData = {
+    expense_category_id: string;
+    spent_at: string;
+    amount: string;
+    description: string;
+    receipt: File | null;
+    is_routine: boolean;
+};
+
+function expenseFormDefaults(): ExpenseFormData {
+    return {
+        expense_category_id: '',
+        spent_at: new Date().toISOString().slice(0, 10),
+        amount: '',
+        description: '',
+        receipt: null,
+        is_routine: false,
+    };
+}
 
 export default function ExpensesIndex({
     expenses,
@@ -65,20 +92,62 @@ export default function ExpensesIndex({
 }) {
     const [open, setOpen] = useState(false);
     const [detail, setDetail] = useState<Expense | null>(null);
-    const form = useForm({
-        expense_category_id: '',
-        spent_at: new Date().toISOString().slice(0, 10),
-        amount: '',
-        description: '',
-        receipt: null as File | null,
-        is_routine: false,
+    const [sort, setSort] = useState<SortState<ExpenseSortKey>>({
+        key: 'date',
+        direction: 'desc',
     });
+    const [processing, setProcessing] = useState(false);
+    const form = useTanStackForm({
+        defaultValues: expenseFormDefaults(),
+        onSubmit: ({ value }) => submit(value),
+    });
+    const sortedCategories = useMemo(
+        () =>
+            [...categories].sort((a, b) => {
+                const aIsOther = a.name.toLowerCase() === 'lainnya';
+                const bIsOther = b.name.toLowerCase() === 'lainnya';
 
-    function submit(event: FormEvent) {
-        event.preventDefault();
-        form.post(store.url(), {
+                if (aIsOther !== bIsOther) {
+                    return aIsOther ? 1 : -1;
+                }
+
+                return a.name.localeCompare(b.name, 'id-ID', {
+                    sensitivity: 'base',
+                });
+            }),
+        [categories],
+    );
+    const sortedExpenses = useMemo(() => {
+        return [...expenses.data].sort((a, b) => {
+            const values: Record<ExpenseSortKey, string | number> = {
+                date: a.spent_at,
+                category: a.category.name,
+                description: a.description,
+                type: a.is_routine ? 'rutin' : 'non_rutin',
+                amount: a.amount,
+            };
+            const otherValues: Record<ExpenseSortKey, string | number> = {
+                date: b.spent_at,
+                category: b.category.name,
+                description: b.description,
+                type: b.is_routine ? 'rutin' : 'non_rutin',
+                amount: b.amount,
+            };
+            const result = compareSortValue(
+                values[sort.key],
+                otherValues[sort.key],
+            );
+
+            return sort.direction === 'asc' ? result : -result;
+        });
+    }, [expenses.data, sort]);
+
+    function submit(value: ExpenseFormData) {
+        router.post(store.url(), value, {
             forceFormData: true,
             preserveScroll: true,
+            onStart: () => setProcessing(true),
+            onFinish: () => setProcessing(false),
             onSuccess: () => setOpen(false),
         });
     }
@@ -102,108 +171,209 @@ export default function ExpensesIndex({
                             </Button>
                         </DialogTrigger>
                         <DialogContent className="sm:max-w-xl">
-                            <form onSubmit={submit} className="grid gap-4">
+                            <form
+                                onSubmit={(event) => {
+                                    event.preventDefault();
+                                    void form.handleSubmit();
+                                }}
+                                className="grid gap-4"
+                            >
                                 <DialogHeader>
                                     <DialogTitle>
                                         Tambah pengeluaran
                                     </DialogTitle>
                                 </DialogHeader>
                                 <div className="grid gap-3 md:grid-cols-2">
-                                    <div className="grid gap-2">
-                                        <Label>Kategori</Label>
-                                        <Select
-                                            value={
-                                                form.data.expense_category_id
-                                            }
-                                            onValueChange={(value) => {
-                                                const category =
-                                                    categories.find(
-                                                        (item) =>
-                                                            String(item.id) ===
+                                    <form.Field
+                                        name="expense_category_id"
+                                        validators={{
+                                            onBlur: requiredField('Kategori'),
+                                            onChange:
+                                                requiredField('Kategori'),
+                                        }}
+                                    >
+                                        {(field) => (
+                                            <div className="grid gap-2">
+                                                <Label>Kategori</Label>
+                                                <Select
+                                                    value={field.state.value}
+                                                    onValueChange={(value) => {
+                                                        const category =
+                                                            categories.find(
+                                                                (item) =>
+                                                                    String(
+                                                                        item.id,
+                                                                    ) ===
+                                                                    value,
+                                                            );
+                                                        field.handleChange(
                                                             value,
-                                                    );
-                                                form.setData(
-                                                    'expense_category_id',
-                                                    value,
-                                                );
-                                                form.setData(
-                                                    'is_routine',
-                                                    category?.is_routine ??
-                                                        false,
-                                                );
-                                            }}
-                                        >
-                                            <SelectTrigger className="w-full">
-                                                <SelectValue placeholder="Pilih kategori" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {categories.map((category) => (
-                                                    <SelectItem
-                                                        key={category.id}
-                                                        value={String(
-                                                            category.id,
+                                                        );
+                                                        form.setFieldValue(
+                                                            'is_routine',
+                                                            category?.is_routine ??
+                                                                false,
+                                                        );
+                                                    }}
+                                                >
+                                                    <SelectTrigger className="w-full">
+                                                        <SelectValue placeholder="Pilih kategori" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        {sortedCategories.map(
+                                                            (category) => (
+                                                                <SelectItem
+                                                                    key={
+                                                                        category.id
+                                                                    }
+                                                                    value={String(
+                                                                        category.id,
+                                                                    )}
+                                                                >
+                                                                    {
+                                                                        category.name
+                                                                    }
+                                                                </SelectItem>
+                                                            ),
                                                         )}
-                                                    >
-                                                        {category.name}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                    <div className="grid gap-2">
-                                        <Label>Tanggal</Label>
-                                        <Input
-                                            type="date"
-                                            value={form.data.spent_at}
-                                            onChange={(e) =>
-                                                form.setData(
-                                                    'spent_at',
-                                                    e.target.value,
-                                                )
-                                            }
-                                        />
-                                    </div>
-                                    <div className="grid gap-2">
-                                        <Label>Nominal</Label>
-                                        <Input
-                                            type="number"
-                                            value={form.data.amount}
-                                            onChange={(e) =>
-                                                form.setData(
-                                                    'amount',
-                                                    e.target.value,
-                                                )
-                                            }
-                                        />
-                                    </div>
-                                    <div className="grid gap-2">
-                                        <Label>Keterangan</Label>
-                                        <Input
-                                            value={form.data.description}
-                                            onChange={(e) =>
-                                                form.setData(
-                                                    'description',
-                                                    e.target.value,
-                                                )
-                                            }
-                                        />
-                                    </div>
+                                                    </SelectContent>
+                                                </Select>
+                                                <FieldError
+                                                    errors={
+                                                        field.state.meta.errors
+                                                    }
+                                                />
+                                            </div>
+                                        )}
+                                    </form.Field>
+                                    <form.Field
+                                        name="spent_at"
+                                        validators={{
+                                            onBlur: requiredField('Tanggal'),
+                                            onChange: requiredField('Tanggal'),
+                                        }}
+                                    >
+                                        {(field) => (
+                                            <div className="grid gap-2">
+                                                <Label htmlFor={field.name}>
+                                                    Tanggal
+                                                </Label>
+                                                <Input
+                                                    id={field.name}
+                                                    type="date"
+                                                    value={field.state.value}
+                                                    onBlur={field.handleBlur}
+                                                    onChange={(event) =>
+                                                        field.handleChange(
+                                                            event.target.value,
+                                                        )
+                                                    }
+                                                />
+                                                <FieldError
+                                                    errors={
+                                                        field.state.meta.errors
+                                                    }
+                                                />
+                                            </div>
+                                        )}
+                                    </form.Field>
+                                    <form.Field
+                                        name="amount"
+                                        validators={{
+                                            onBlur: requiredField('Nominal'),
+                                            onChange: requiredField('Nominal'),
+                                        }}
+                                    >
+                                        {(field) => (
+                                            <div className="grid gap-2">
+                                                <Label htmlFor={field.name}>
+                                                    Nominal
+                                                </Label>
+                                                <Input
+                                                    id={field.name}
+                                                    type="number"
+                                                    value={field.state.value}
+                                                    onBlur={field.handleBlur}
+                                                    onChange={(event) =>
+                                                        field.handleChange(
+                                                            event.target.value,
+                                                        )
+                                                    }
+                                                />
+                                                <FieldError
+                                                    errors={
+                                                        field.state.meta.errors
+                                                    }
+                                                />
+                                            </div>
+                                        )}
+                                    </form.Field>
+                                    <form.Field
+                                        name="description"
+                                        validators={{
+                                            onBlur: requiredField('Keterangan'),
+                                            onChange:
+                                                requiredField('Keterangan'),
+                                        }}
+                                    >
+                                        {(field) => (
+                                            <div className="grid gap-2">
+                                                <Label htmlFor={field.name}>
+                                                    Keterangan
+                                                </Label>
+                                                <Input
+                                                    id={field.name}
+                                                    value={field.state.value}
+                                                    onBlur={field.handleBlur}
+                                                    onChange={(event) =>
+                                                        field.handleChange(
+                                                            event.target.value,
+                                                        )
+                                                    }
+                                                />
+                                                <FieldError
+                                                    errors={
+                                                        field.state.meta.errors
+                                                    }
+                                                />
+                                            </div>
+                                        )}
+                                    </form.Field>
                                     <div className="md:col-span-2">
                                         <ImageInput
                                             name="receipt"
                                             label="Preview bukti"
                                             onFile={(file) =>
-                                                form.setData('receipt', file)
+                                                form.setFieldValue(
+                                                    'receipt',
+                                                    file,
+                                                )
                                             }
                                         />
                                     </div>
                                 </div>
                                 <DialogFooter>
-                                    <Button disabled={form.processing}>
-                                        {form.processing
-                                            ? 'Menyimpan...'
-                                            : 'Simpan'}
-                                    </Button>
+                                    <form.Subscribe
+                                        selector={(state) => ({
+                                            canSubmit: state.canSubmit,
+                                            isSubmitting: state.isSubmitting,
+                                        })}
+                                    >
+                                        {({ canSubmit, isSubmitting }) => (
+                                            <Button
+                                                type="submit"
+                                                disabled={
+                                                    !canSubmit ||
+                                                    isSubmitting ||
+                                                    processing
+                                                }
+                                            >
+                                                {processing
+                                                    ? 'Menyimpan...'
+                                                    : 'Simpan'}
+                                            </Button>
+                                        )}
+                                    </form.Subscribe>
                                 </DialogFooter>
                             </form>
                         </DialogContent>
@@ -214,21 +384,59 @@ export default function ExpensesIndex({
                     <CardHeader>
                         <CardTitle>
                             Daftar pengeluaran{' '}
-                            {String(filters.month).padStart(2, '0')}/
-                            {filters.year}
+                            {period(filters.month, filters.year)}
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="grid gap-3">
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead>Tanggal</TableHead>
-                                    <TableHead>Kategori</TableHead>
-                                    <TableHead>Keterangan</TableHead>
-                                    <TableHead>Tipe</TableHead>
-                                    <TableHead className="text-right">
+                                    <SortableTableHead
+                                        sortKey="date"
+                                        sort={sort}
+                                        onSort={(key) =>
+                                            setSort(nextSort(sort, key))
+                                        }
+                                    >
+                                        Tanggal
+                                    </SortableTableHead>
+                                    <SortableTableHead
+                                        sortKey="category"
+                                        sort={sort}
+                                        onSort={(key) =>
+                                            setSort(nextSort(sort, key))
+                                        }
+                                    >
+                                        Kategori
+                                    </SortableTableHead>
+                                    <SortableTableHead
+                                        sortKey="description"
+                                        sort={sort}
+                                        onSort={(key) =>
+                                            setSort(nextSort(sort, key))
+                                        }
+                                    >
+                                        Keterangan
+                                    </SortableTableHead>
+                                    <SortableTableHead
+                                        sortKey="type"
+                                        sort={sort}
+                                        onSort={(key) =>
+                                            setSort(nextSort(sort, key))
+                                        }
+                                    >
+                                        Tipe
+                                    </SortableTableHead>
+                                    <SortableTableHead
+                                        sortKey="amount"
+                                        sort={sort}
+                                        onSort={(key) =>
+                                            setSort(nextSort(sort, key))
+                                        }
+                                        className="text-right"
+                                    >
                                         Nominal
-                                    </TableHead>
+                                    </SortableTableHead>
                                     <TableHead className="text-right">
                                         Aksi
                                     </TableHead>
@@ -238,7 +446,7 @@ export default function ExpensesIndex({
                                 {expenses.data.length === 0 ? (
                                     <EmptyRow colSpan={6} />
                                 ) : (
-                                    expenses.data.map((expense) => (
+                                    sortedExpenses.map((expense) => (
                                         <TableRow
                                             key={expense.id}
                                             className="cursor-pointer"
@@ -256,9 +464,13 @@ export default function ExpensesIndex({
                                                 {expense.description}
                                             </TableCell>
                                             <TableCell>
-                                                {expense.is_routine
-                                                    ? 'Rutin'
-                                                    : 'Non-rutin'}
+                                                <StatusBadge
+                                                    value={
+                                                        expense.is_routine
+                                                            ? 'rutin'
+                                                            : 'non_rutin'
+                                                    }
+                                                />
                                             </TableCell>
                                             <TableCell className="text-right">
                                                 {money(expense.amount)}

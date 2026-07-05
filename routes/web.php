@@ -15,6 +15,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');
 
     Route::resource('residents', ResidentController::class)->except(['create', 'edit']);
+    Route::get('residents/{resident}/ktp-photo', [ResidentController::class, 'ktpPhoto'])->name('residents.ktp-photo');
     Route::resource('houses', HouseController::class)->except(['create', 'edit', 'show']);
     Route::post('houses/{house}/occupancies', [HouseController::class, 'assignResident'])->name('houses.occupancies.store');
     Route::patch('houses/{house}/occupancies/{occupancy}/end', [HouseController::class, 'endOccupancy'])->name('houses.occupancies.end');

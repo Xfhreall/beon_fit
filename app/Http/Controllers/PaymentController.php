@@ -42,8 +42,7 @@ class PaymentController extends Controller
                 ->where('period_month', $filters['month'])
                 ->when($filters['status'] !== '', fn ($query) => $query->where('status', $filters['status']))
                 ->orderBy('status')
-                ->paginate(12, ['*'], 'bills_page')
-                ->withQueryString(),
+                ->get(),
             'houses' => House::with('activeOccupancies.resident:id,name')->orderBy('number')->get(['id', 'number', 'block', 'status']),
             'residents' => Resident::query()
                 ->with('activeOccupancies.house:id,number')

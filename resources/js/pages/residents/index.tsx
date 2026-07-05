@@ -1,7 +1,7 @@
-import { Head, router, useForm } from '@inertiajs/react';
-import { Edit, Plus } from 'lucide-react';
-import type { FormEvent } from 'react';
-import { useState } from 'react';
+import { Head, router } from '@inertiajs/react';
+import { useForm as useTanStackForm } from '@tanstack/react-form';
+import { Edit, ImageIcon, Plus } from 'lucide-react';
+import { useMemo, useState } from 'react';
 import {
     destroy,
     index,
@@ -35,15 +35,20 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import type { Paginated } from '../rt-finance/shared';
+import type { Paginated, SortState } from '../rt-finance/shared';
 import {
     ConfirmDeleteButton,
     DebouncedSearchInput,
     DetailDialog,
     EmptyRow,
+    FieldError,
+    compareSortValue,
     formatWibDateTime,
     ImageInput,
+    nextSort,
     Pagination,
+    requiredField,
+    SortableTableHead,
     StatusBadge,
 } from '../rt-finance/shared';
 
@@ -54,6 +59,7 @@ type Resident = {
     resident_status: string;
     marital_status: string;
     active_occupancies: { house?: { number: string } }[];
+    ktp_photo_url?: string | null;
     created_at?: string;
     updated_at?: string;
 };
@@ -65,6 +71,15 @@ type FormData = {
     marital_status: string;
     ktp_photo: File | null;
 };
+type ResidentSortKey = 'name' | 'phone' | 'status' | 'marital' | 'house';
+
+const residentFormDefaults: FormData = {
+    name: '',
+    phone: '',
+    resident_status: 'tetap',
+    marital_status: 'menikah',
+    ktp_photo: null,
+};
 
 export default function ResidentsIndex({
     residents,
@@ -75,35 +90,63 @@ export default function ResidentsIndex({
 }) {
     const [editing, setEditing] = useState<Resident | null>(null);
     const [detail, setDetail] = useState<Resident | null>(null);
+    const [ktpPreview, setKtpPreview] = useState<Resident | null>(null);
     const [open, setOpen] = useState(false);
-    const form = useForm<FormData>({
-        name: '',
-        phone: '',
-        resident_status: 'tetap',
-        marital_status: 'menikah',
-        ktp_photo: null,
+    const [sort, setSort] = useState<SortState<ResidentSortKey>>({
+        key: 'name',
+        direction: 'asc',
     });
+    const [processing, setProcessing] = useState(false);
+    const form = useTanStackForm({
+        defaultValues: residentFormDefaults,
+        onSubmit: ({ value }) => submit(value),
+    });
+    const sortedResidents = useMemo(() => {
+        return [...residents.data].sort((a, b) => {
+            const values: Record<ResidentSortKey, string | number> = {
+                name: a.name,
+                phone: a.phone,
+                status: a.resident_status,
+                marital: a.marital_status,
+                house: a.active_occupancies[0]?.house?.number ?? '',
+            };
+            const otherValues: Record<ResidentSortKey, string | number> = {
+                name: b.name,
+                phone: b.phone,
+                status: b.resident_status,
+                marital: b.marital_status,
+                house: b.active_occupancies[0]?.house?.number ?? '',
+            };
+            const result = compareSortValue(
+                values[sort.key],
+                otherValues[sort.key],
+            );
 
-    function submit(event: FormEvent) {
-        event.preventDefault();
+            return sort.direction === 'asc' ? result : -result;
+        });
+    }, [residents.data, sort]);
+
+    function submit(value: FormData) {
         const options = {
             forceFormData: true,
             preserveScroll: true,
+            onStart: () => setProcessing(true),
+            onFinish: () => setProcessing(false),
             onSuccess: () => setOpen(false),
         };
 
         if (editing) {
-            form.post(update.form.patch(editing.id).action, options);
+            router.post(update.form.patch(editing.id).action, value, options);
 
             return;
         }
 
-        form.post(store.url(), options);
+        router.post(store.url(), value, options);
     }
 
     function startEdit(resident: Resident) {
         setEditing(resident);
-        form.setData({
+        form.reset({
             name: resident.name,
             phone: resident.phone,
             resident_status: resident.resident_status,
@@ -115,9 +158,7 @@ export default function ResidentsIndex({
 
     function startCreate() {
         setEditing(null);
-        form.reset();
-        form.setData('resident_status', 'tetap');
-        form.setData('marital_status', 'menikah');
+        form.reset(residentFormDefaults);
         setOpen(true);
     }
 
@@ -140,7 +181,13 @@ export default function ResidentsIndex({
                             </Button>
                         </DialogTrigger>
                         <DialogContent className="sm:max-w-xl">
-                            <form onSubmit={submit} className="grid gap-4">
+                            <form
+                                onSubmit={(event) => {
+                                    event.preventDefault();
+                                    void form.handleSubmit();
+                                }}
+                                className="grid gap-4"
+                            >
                                 <DialogHeader>
                                     <DialogTitle>
                                         {editing
@@ -149,99 +196,157 @@ export default function ResidentsIndex({
                                     </DialogTitle>
                                 </DialogHeader>
                                 <div className="grid gap-3 md:grid-cols-2">
-                                    <div className="grid gap-2">
-                                        <Label>Nama lengkap</Label>
-                                        <Input
-                                            value={form.data.name}
-                                            onChange={(event) =>
-                                                form.setData(
-                                                    'name',
-                                                    event.target.value,
-                                                )
-                                            }
-                                            required
-                                        />
-                                    </div>
-                                    <div className="grid gap-2">
-                                        <Label>Nomor telepon</Label>
-                                        <Input
-                                            value={form.data.phone}
-                                            onChange={(event) =>
-                                                form.setData(
-                                                    'phone',
-                                                    event.target.value,
-                                                )
-                                            }
-                                            required
-                                        />
-                                    </div>
-                                    <div className="grid gap-2">
-                                        <Label>Status penghuni</Label>
-                                        <Select
-                                            value={form.data.resident_status}
-                                            onValueChange={(value) =>
-                                                form.setData(
-                                                    'resident_status',
-                                                    value,
-                                                )
-                                            }
-                                        >
-                                            <SelectTrigger className="w-full">
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="tetap">
-                                                    Tetap
-                                                </SelectItem>
-                                                <SelectItem value="kontrak">
-                                                    Kontrak
-                                                </SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                    <div className="grid gap-2">
-                                        <Label>Status pernikahan</Label>
-                                        <Select
-                                            value={form.data.marital_status}
-                                            onValueChange={(value) =>
-                                                form.setData(
-                                                    'marital_status',
-                                                    value,
-                                                )
-                                            }
-                                        >
-                                            <SelectTrigger className="w-full">
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="menikah">
-                                                    Menikah
-                                                </SelectItem>
-                                                <SelectItem value="belum_menikah">
-                                                    Belum menikah
-                                                </SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
+                                    <form.Field
+                                        name="name"
+                                        validators={{
+                                            onBlur: requiredField(
+                                                'Nama lengkap',
+                                            ),
+                                            onChange:
+                                                requiredField('Nama lengkap'),
+                                        }}
+                                    >
+                                        {(field) => (
+                                            <div className="grid gap-2">
+                                                <Label htmlFor={field.name}>
+                                                    Nama lengkap
+                                                </Label>
+                                                <Input
+                                                    id={field.name}
+                                                    value={field.state.value}
+                                                    onBlur={field.handleBlur}
+                                                    onChange={(event) =>
+                                                        field.handleChange(
+                                                            event.target.value,
+                                                        )
+                                                    }
+                                                />
+                                                <FieldError
+                                                    errors={
+                                                        field.state.meta.errors
+                                                    }
+                                                />
+                                            </div>
+                                        )}
+                                    </form.Field>
+                                    <form.Field
+                                        name="phone"
+                                        validators={{
+                                            onBlur: requiredField(
+                                                'Nomor telepon',
+                                            ),
+                                            onChange:
+                                                requiredField('Nomor telepon'),
+                                        }}
+                                    >
+                                        {(field) => (
+                                            <div className="grid gap-2">
+                                                <Label htmlFor={field.name}>
+                                                    Nomor telepon
+                                                </Label>
+                                                <Input
+                                                    id={field.name}
+                                                    value={field.state.value}
+                                                    onBlur={field.handleBlur}
+                                                    onChange={(event) =>
+                                                        field.handleChange(
+                                                            event.target.value,
+                                                        )
+                                                    }
+                                                />
+                                                <FieldError
+                                                    errors={
+                                                        field.state.meta.errors
+                                                    }
+                                                />
+                                            </div>
+                                        )}
+                                    </form.Field>
+                                    <form.Field name="resident_status">
+                                        {(field) => (
+                                            <div className="grid gap-2">
+                                                <Label>Status penghuni</Label>
+                                                <Select
+                                                    value={field.state.value}
+                                                    onValueChange={
+                                                        field.handleChange
+                                                    }
+                                                >
+                                                    <SelectTrigger className="w-full">
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="tetap">
+                                                            Tetap
+                                                        </SelectItem>
+                                                        <SelectItem value="kontrak">
+                                                            Kontrak
+                                                        </SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                        )}
+                                    </form.Field>
+                                    <form.Field name="marital_status">
+                                        {(field) => (
+                                            <div className="grid gap-2">
+                                                <Label>Status pernikahan</Label>
+                                                <Select
+                                                    value={field.state.value}
+                                                    onValueChange={
+                                                        field.handleChange
+                                                    }
+                                                >
+                                                    <SelectTrigger className="w-full">
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="menikah">
+                                                            Menikah
+                                                        </SelectItem>
+                                                        <SelectItem value="belum_menikah">
+                                                            Belum menikah
+                                                        </SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                        )}
+                                    </form.Field>
                                     <div className="md:col-span-2">
                                         <ImageInput
                                             name="ktp_photo"
                                             label="Preview KTP"
                                             onFile={(file) =>
-                                                form.setData('ktp_photo', file)
+                                                form.setFieldValue(
+                                                    'ktp_photo',
+                                                    file,
+                                                )
                                             }
                                         />
                                     </div>
                                 </div>
                                 <DialogFooter>
-                                    <Button
-                                        type="submit"
-                                        disabled={form.processing}
+                                    <form.Subscribe
+                                        selector={(state) => ({
+                                            canSubmit: state.canSubmit,
+                                            isSubmitting: state.isSubmitting,
+                                        })}
                                     >
-                                        {form.processing
-                                            ? 'Menyimpan...'
-                                            : 'Simpan'}
-                                    </Button>
+                                        {({ canSubmit, isSubmitting }) => (
+                                            <Button
+                                                type="submit"
+                                                disabled={
+                                                    !canSubmit ||
+                                                    isSubmitting ||
+                                                    processing
+                                                }
+                                            >
+                                                {processing
+                                                    ? 'Menyimpan...'
+                                                    : 'Simpan'}
+                                            </Button>
+                                        )}
+                                    </form.Subscribe>
                                 </DialogFooter>
                             </form>
                         </DialogContent>
@@ -263,11 +368,52 @@ export default function ResidentsIndex({
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead>Nama</TableHead>
-                                    <TableHead>Telepon</TableHead>
-                                    <TableHead>Status</TableHead>
-                                    <TableHead>Pernikahan</TableHead>
-                                    <TableHead>Rumah aktif</TableHead>
+                                    <SortableTableHead
+                                        sortKey="name"
+                                        sort={sort}
+                                        onSort={(key) =>
+                                            setSort(nextSort(sort, key))
+                                        }
+                                    >
+                                        Nama
+                                    </SortableTableHead>
+                                    <SortableTableHead
+                                        sortKey="phone"
+                                        sort={sort}
+                                        onSort={(key) =>
+                                            setSort(nextSort(sort, key))
+                                        }
+                                    >
+                                        Telepon
+                                    </SortableTableHead>
+                                    <SortableTableHead
+                                        sortKey="status"
+                                        sort={sort}
+                                        onSort={(key) =>
+                                            setSort(nextSort(sort, key))
+                                        }
+                                    >
+                                        Status
+                                    </SortableTableHead>
+                                    <SortableTableHead
+                                        sortKey="marital"
+                                        sort={sort}
+                                        onSort={(key) =>
+                                            setSort(nextSort(sort, key))
+                                        }
+                                    >
+                                        Pernikahan
+                                    </SortableTableHead>
+                                    <SortableTableHead
+                                        sortKey="house"
+                                        sort={sort}
+                                        onSort={(key) =>
+                                            setSort(nextSort(sort, key))
+                                        }
+                                    >
+                                        Rumah aktif
+                                    </SortableTableHead>
+                                    <TableHead>KTP</TableHead>
                                     <TableHead className="text-right">
                                         Aksi
                                     </TableHead>
@@ -275,9 +421,9 @@ export default function ResidentsIndex({
                             </TableHeader>
                             <TableBody>
                                 {residents.data.length === 0 ? (
-                                    <EmptyRow colSpan={6} />
+                                    <EmptyRow colSpan={7} />
                                 ) : (
-                                    residents.data.map((resident) => (
+                                    sortedResidents.map((resident) => (
                                         <TableRow
                                             key={resident.id}
                                             className="cursor-pointer"
@@ -305,6 +451,22 @@ export default function ResidentsIndex({
                                             <TableCell>
                                                 {resident.active_occupancies[0]
                                                     ?.house?.number ?? '-'}
+                                            </TableCell>
+                                            <TableCell>
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    disabled={
+                                                        !resident.ktp_photo_url
+                                                    }
+                                                    onClick={(event) => {
+                                                        event.stopPropagation();
+                                                        setKtpPreview(resident);
+                                                    }}
+                                                >
+                                                    <ImageIcon className="size-4" />
+                                                    Lihat
+                                                </Button>
                                             </TableCell>
                                             <TableCell>
                                                 <div className="flex justify-end gap-1">
@@ -363,11 +525,34 @@ export default function ResidentsIndex({
                                 detail.active_occupancies[0]?.house?.number ??
                                     '-',
                             ],
+                            [
+                                'KTP',
+                                detail.ktp_photo_url ? 'Tersedia' : 'Belum ada',
+                            ],
                             ['Dibuat', formatWibDateTime(detail.created_at)],
                             ['Diubah', formatWibDateTime(detail.updated_at)],
                         ]}
                     />
                 )}
+                <Dialog
+                    open={ktpPreview !== null}
+                    onOpenChange={(value) => !value && setKtpPreview(null)}
+                >
+                    <DialogContent className="sm:max-w-2xl">
+                        <DialogHeader>
+                            <DialogTitle>
+                                KTP {ktpPreview?.name ?? ''}
+                            </DialogTitle>
+                        </DialogHeader>
+                        {ktpPreview?.ktp_photo_url && (
+                            <img
+                                src={ktpPreview.ktp_photo_url}
+                                alt={`KTP ${ktpPreview.name}`}
+                                className="max-h-[70vh] w-full rounded-lg object-contain"
+                            />
+                        )}
+                    </DialogContent>
+                </Dialog>
             </div>
         </>
     );

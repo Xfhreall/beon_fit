@@ -4,9 +4,19 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import laravel from 'laravel-vite-plugin';
 import { bunny } from 'laravel-vite-plugin/fonts';
+import { fileURLToPath, URL } from 'node:url';
 import { defineConfig } from 'vite';
 
 export default defineConfig({
+    resolve: {
+        alias: {
+            react: fileURLToPath(new URL('./node_modules/react', import.meta.url)),
+            'react-dom': fileURLToPath(
+                new URL('./node_modules/react-dom', import.meta.url),
+            ),
+        },
+        dedupe: ['react', 'react-dom'],
+    },
     plugins: [
         laravel({
             input: ['resources/css/app.css', 'resources/js/app.tsx'],

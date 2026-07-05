@@ -1,28 +1,20 @@
 import { router } from '@inertiajs/react';
-import { ImageIcon, Trash2 } from 'lucide-react';
+import { ArrowUpDown, ImageIcon, Trash2 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-    AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
     DialogContent,
+    DialogFooter,
     DialogHeader,
     DialogTitle,
+    DialogTrigger,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { TableCell, TableRow } from '@/components/ui/table';
+import { TableCell, TableHead, TableRow } from '@/components/ui/table';
+export { FieldError, requiredField } from '@/lib/tanstack-form';
 
 export type PaginationLink = {
     url: string | null;
@@ -47,7 +39,15 @@ export function money(value: number): string {
 }
 
 export function period(month: number, year: number): string {
-    return `${String(month).padStart(2, '0')}/${year}`;
+    return `${monthName(month)} ${year}`;
+}
+
+export function monthName(month: number): string {
+    return (
+        new Intl.DateTimeFormat('id-ID', { month: 'long' }).format(
+            new Date(2026, month - 1, 1),
+        ) || '-'
+    );
 }
 
 export function formatWibDateTime(value?: string | null): string {
@@ -76,14 +76,100 @@ export function formatWibDateTime(value?: string | null): string {
 }
 
 export function StatusBadge({ value }: { value: string }) {
-    const variant =
-        value === 'lunas' || value === 'dihuni'
-            ? 'default'
-            : value === 'sebagian'
-              ? 'secondary'
-              : 'outline';
+    const colors: Record<string, string> = {
+        lunas: 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300',
+        dihuni: 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300',
+        sebagian:
+            'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300',
+        belum_lunas:
+            'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300',
+        tidak_dihuni:
+            'border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-300',
+        tetap: 'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-300',
+        kontrak:
+            'border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-900 dark:bg-violet-950/40 dark:text-violet-300',
+        menikah:
+            'border-cyan-200 bg-cyan-50 text-cyan-700 dark:border-cyan-900 dark:bg-cyan-950/40 dark:text-cyan-300',
+        belum_menikah:
+            'border-zinc-200 bg-zinc-50 text-zinc-700 dark:border-zinc-800 dark:bg-zinc-950/40 dark:text-zinc-300',
+        rutin: 'border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-900 dark:bg-indigo-950/40 dark:text-indigo-300',
+        non_rutin:
+            'border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-900 dark:bg-orange-950/40 dark:text-orange-300',
+    };
 
-    return <Badge variant={variant}>{value.replace('_', ' ')}</Badge>;
+    return (
+        <Badge variant="outline" className={colors[value] ?? undefined}>
+            {value.replace(/_/g, ' ')}
+        </Badge>
+    );
+}
+
+export type SortDirection = 'asc' | 'desc';
+export type SortState<Key extends string> = {
+    key: Key;
+    direction: SortDirection;
+};
+
+export function nextSort<Key extends string>(
+    current: SortState<Key>,
+    key: Key,
+): SortState<Key> {
+    return {
+        key,
+        direction:
+            current.key === key && current.direction === 'asc' ? 'desc' : 'asc',
+    };
+}
+
+export function compareSortValue(a: string | number, b: string | number) {
+    if (typeof a === 'number' && typeof b === 'number') {
+        return a - b;
+    }
+
+    return String(a).localeCompare(String(b), 'id-ID', {
+        numeric: true,
+        sensitivity: 'base',
+    });
+}
+
+export function SortableTableHead<Key extends string>({
+    sortKey,
+    sort,
+    onSort,
+    children,
+    className,
+}: {
+    sortKey: Key;
+    sort: SortState<Key>;
+    onSort: (key: Key) => void;
+    children: ReactNode;
+    className?: string;
+}) {
+    return (
+        <TableHead className={className}>
+            <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="-ml-2 h-8 justify-start px-2"
+                onClick={() => onSort(sortKey)}
+            >
+                {children}
+                <ArrowUpDown
+                    className={
+                        sort.key === sortKey
+                            ? 'size-3.5 opacity-100'
+                            : 'size-3.5 opacity-45'
+                    }
+                />
+                {sort.key === sortKey && (
+                    <span className="sr-only">
+                        {sort.direction === 'asc' ? 'Urut naik' : 'Urut turun'}
+                    </span>
+                )}
+            </Button>
+        </TableHead>
+    );
 }
 
 export function EmptyRow({
@@ -219,39 +305,45 @@ export function ConfirmDeleteButton({
     onConfirm: () => void;
     disabled?: boolean;
 }) {
+    const [open, setOpen] = useState(false);
+
     return (
-        <AlertDialog>
-            <AlertDialogTrigger asChild>
+        <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
                 <Button
                     size="icon-sm"
                     variant="ghost"
                     disabled={disabled}
                     onClick={(event) => event.stopPropagation()}
+                    onPointerDown={(event) => event.stopPropagation()}
                 >
                     <Trash2 className="size-4" />
                 </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                    <AlertDialogTitle>{title}</AlertDialogTitle>
-                    <AlertDialogDescription>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-sm">
+                <DialogHeader>
+                    <DialogTitle>{title}</DialogTitle>
+                    <p className="text-sm text-muted-foreground">
                         {description}
-                    </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                    <AlertDialogCancel>Batal</AlertDialogCancel>
-                    <AlertDialogAction
+                    </p>
+                </DialogHeader>
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => setOpen(false)}>
+                        Batal
+                    </Button>
+                    <Button
                         variant="destructive"
                         onClick={(event) => {
                             event.stopPropagation();
                             onConfirm();
+                            setOpen(false);
                         }}
                     >
                         Hapus
-                    </AlertDialogAction>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     );
 }
 

@@ -1,5 +1,6 @@
-import { Form } from '@inertiajs/react';
-import { useRef } from 'react';
+import { router } from '@inertiajs/react';
+import { useForm as useTanStackForm } from '@tanstack/react-form';
+import { useRef, useState } from 'react';
 import ProfileController from '@/actions/App/Http/Controllers/Settings/ProfileController';
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
@@ -15,9 +16,39 @@ import {
     DialogTrigger,
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import {
+    FieldError,
+    requiredField,
+    useServerErrors,
+} from '@/lib/tanstack-form';
+
+type DeleteUserFormData = {
+    password: string;
+};
+
+const deleteUserFormDefaults: DeleteUserFormData = {
+    password: '',
+};
 
 export default function DeleteUser() {
     const passwordInput = useRef<HTMLInputElement>(null);
+    const errors = useServerErrors();
+    const [processing, setProcessing] = useState(false);
+    const form = useTanStackForm({
+        defaultValues: deleteUserFormDefaults,
+        onSubmit: ({ value }) => {
+            router.post(ProfileController.destroy.form().action, value, {
+                preserveScroll: true,
+                onStart: () => setProcessing(true),
+                onFinish: () => setProcessing(false),
+                onError: () => {
+                    passwordInput.current?.focus();
+                    form.reset(deleteUserFormDefaults);
+                },
+                onSuccess: () => form.reset(deleteUserFormDefaults),
+            });
+        },
+    });
 
     return (
         <div className="space-y-6">
@@ -54,64 +85,87 @@ export default function DeleteUser() {
                             permanently delete your account.
                         </DialogDescription>
 
-                        <Form
-                            {...ProfileController.destroy.form()}
-                            options={{
-                                preserveScroll: true,
+                        <form
+                            onSubmit={(event) => {
+                                event.preventDefault();
+                                void form.handleSubmit();
                             }}
-                            onError={() => passwordInput.current?.focus()}
-                            resetOnSuccess
                             className="space-y-6"
                         >
-                            {({ resetAndClearErrors, processing, errors }) => (
-                                <>
+                            <form.Field
+                                name="password"
+                                validators={{
+                                    onBlur: requiredField('Password'),
+                                    onChange: requiredField('Password'),
+                                }}
+                            >
+                                {(field) => (
                                     <div className="grid gap-2">
                                         <Label
-                                            htmlFor="password"
+                                            htmlFor={field.name}
                                             className="sr-only"
                                         >
                                             Password
                                         </Label>
 
                                         <PasswordInput
-                                            id="password"
-                                            name="password"
+                                            id={field.name}
+                                            value={field.state.value}
+                                            onBlur={field.handleBlur}
+                                            onChange={(event) =>
+                                                field.handleChange(
+                                                    event.target.value,
+                                                )
+                                            }
                                             ref={passwordInput}
                                             placeholder="Password"
                                             autoComplete="current-password"
                                         />
 
+                                        <FieldError
+                                            errors={field.state.meta.errors}
+                                        />
                                         <InputError message={errors.password} />
                                     </div>
+                                )}
+                            </form.Field>
 
-                                    <DialogFooter className="gap-2">
-                                        <DialogClose asChild>
-                                            <Button
-                                                variant="secondary"
-                                                onClick={() =>
-                                                    resetAndClearErrors()
-                                                }
-                                            >
-                                                Cancel
-                                            </Button>
-                                        </DialogClose>
+                            <DialogFooter className="gap-2">
+                                <DialogClose asChild>
+                                    <Button
+                                        type="button"
+                                        variant="secondary"
+                                        onClick={() =>
+                                            form.reset(deleteUserFormDefaults)
+                                        }
+                                    >
+                                        Cancel
+                                    </Button>
+                                </DialogClose>
 
+                                <form.Subscribe
+                                    selector={(state) => ({
+                                        canSubmit: state.canSubmit,
+                                        isSubmitting: state.isSubmitting,
+                                    })}
+                                >
+                                    {({ canSubmit, isSubmitting }) => (
                                         <Button
+                                            type="submit"
                                             variant="destructive"
-                                            disabled={processing}
-                                            asChild
+                                            disabled={
+                                                !canSubmit ||
+                                                isSubmitting ||
+                                                processing
+                                            }
+                                            data-test="confirm-delete-user-button"
                                         >
-                                            <button
-                                                type="submit"
-                                                data-test="confirm-delete-user-button"
-                                            >
-                                                Delete account
-                                            </button>
+                                            Delete account
                                         </Button>
-                                    </DialogFooter>
-                                </>
-                            )}
-                        </Form>
+                                    )}
+                                </form.Subscribe>
+                            </DialogFooter>
+                        </form>
                     </DialogContent>
                 </Dialog>
             </div>

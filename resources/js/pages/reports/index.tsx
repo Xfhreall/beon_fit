@@ -29,6 +29,7 @@ import {
     EmptyRow,
     formatWibDateTime,
     money,
+    period,
 } from '../rt-finance/shared';
 
 type Series = {
@@ -92,7 +93,7 @@ export default function ReportsIndex({
                     <h1 className="text-xl font-semibold">Laporan</h1>
                     <p className="text-sm text-muted-foreground">
                         Summary dan audit transaksi{' '}
-                        {String(filters.month).padStart(2, '0')}/{filters.year}.
+                        {period(filters.month, filters.year)}.
                     </p>
                 </div>
 

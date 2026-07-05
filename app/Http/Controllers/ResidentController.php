@@ -8,8 +8,10 @@ use App\Models\Occupancy;
 use App\Models\Resident;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class ResidentController extends Controller
 {
@@ -32,6 +34,16 @@ class ResidentController extends Controller
             ->latest()
             ->paginate(12)
             ->withQueryString();
+        $residents->through(function (Resident $resident): Resident {
+            $resident->setAttribute(
+                'ktp_photo_url',
+                $resident->ktp_photo_path
+                    ? route('residents.ktp-photo', $resident)
+                    : null,
+            );
+
+            return $resident;
+        });
 
         return Inertia::render('residents/index', [
             'residents' => $residents,
@@ -61,6 +73,14 @@ class ResidentController extends Controller
         return Inertia::render('residents/show', [
             'resident' => $resident->load(['occupancies.house:id,number,block']),
         ]);
+    }
+
+    public function ktpPhoto(Resident $resident): BinaryFileResponse
+    {
+        abort_if($resident->ktp_photo_path === null, 404);
+        abort_unless(Storage::exists($resident->ktp_photo_path), 404);
+
+        return response()->file(Storage::path($resident->ktp_photo_path));
     }
 
     public function update(UpdateResidentRequest $request, Resident $resident): RedirectResponse
