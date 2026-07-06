@@ -2,6 +2,36 @@
 
 Aplikasi web untuk administrasi iuran, penghuni, rumah, pembayaran, pengeluaran, dan laporan keuangan RT.
 
+## Getting Started
+
+```bash
+# Clone
+git clone https://github.com/Xfhreall/beon_fit_be.git
+cd beon_fit_be
+
+# Backend setup
+composer install
+cp .env.example .env
+php artisan key:generate
+php artisan storage:link
+
+# Frontend setup
+npm install
+
+# Database migration & seed
+php artisan migrate --seed
+
+# Run dev servers (backend + frontend)
+composer run dev
+```
+
+Buka `http://localhost:8000` di browser. Login default:
+
+```text
+Email    : admin@gmail.com
+Password : password
+```
+
 ## Scope
 
 - Authentication admin RT.
@@ -79,24 +109,6 @@ php artisan serve
 npm run dev
 ```
 
-## Default Login
-
-```text
-Email    : admin@gmail.com
-Password : password
-```
-
-## Main Routes
-
-| Menu | URL |
-|---|---|
-| Login | `/login` |
-| Dashboard | `/dashboard` |
-| Penghuni | `/residents` |
-| Rumah | `/houses` |
-| Pembayaran / Tagihan | `/payments` |
-| Pengeluaran | `/expenses` |
-| Laporan | `/reports` |
 
 ## Feature Rules
 
@@ -252,23 +264,3 @@ npm run lint:check
 npm run types:check
 npm run build
 ```
-
-## Screenshot Checklist
-
-PRD deliverable screenshot list:
-
-- Login.
-- Dashboard dengan card statistik.
-- Dashboard dengan chart line, bar, dan donut.
-- Penghuni.
-- Dialog tambah/edit penghuni.
-- Preview foto KTP.
-- Rumah.
-- Riwayat penghuni rumah.
-- Pembayaran.
-- Dialog tambah pembayaran.
-- Pengeluaran.
-- Preview bukti pengeluaran.
-- Laporan summary.
-- Grafik tahunan.
-- Detail laporan bulanan.
