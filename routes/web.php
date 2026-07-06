@@ -3,6 +3,7 @@
 use App\Http\Controllers\BillGenerationController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ExpenseController;
+use App\Http\Controllers\FeeTypeController;
 use App\Http\Controllers\HouseController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\ReportController;
@@ -20,9 +21,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('houses/{house}/occupancies', [HouseController::class, 'assignResident'])->name('houses.occupancies.store');
     Route::patch('houses/{house}/occupancies/{occupancy}/end', [HouseController::class, 'endOccupancy'])->name('houses.occupancies.end');
     Route::resource('payments', PaymentController::class)->except(['create', 'edit', 'show']);
+    Route::patch('fee-types/{feeType}', [FeeTypeController::class, 'update'])->name('fee-types.update');
     Route::resource('expenses', ExpenseController::class)->except(['create', 'edit', 'show']);
     Route::post('bills/generate', BillGenerationController::class)->name('bills.generate');
     Route::get('reports', ReportController::class)->name('reports.index');
 });
 
 require __DIR__.'/settings.php';
+require __DIR__.'/api.php';

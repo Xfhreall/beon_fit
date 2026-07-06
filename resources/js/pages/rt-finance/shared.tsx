@@ -2,6 +2,7 @@ import { router, usePage } from '@inertiajs/react';
 import { ArrowUpDown, ImageIcon, Trash2 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -501,10 +502,12 @@ export function ImageInput({
     name,
     label,
     onFile,
+    maxSizeMb = 2,
 }: {
     name: string;
     label: string;
     onFile?: (file: File | null) => void;
+    maxSizeMb?: number;
 }) {
     const [preview, setPreview] = useState<string | null>(null);
 
@@ -516,6 +519,18 @@ export function ImageInput({
                 accept="image/png,image/jpeg,image/webp"
                 onChange={(event) => {
                     const file = event.currentTarget.files?.[0];
+
+                    if (file && file.size > maxSizeMb * 1024 * 1024) {
+                        toast.error(
+                            `Ukuran file terlalu besar. Maksimal ${maxSizeMb}MB.`,
+                        );
+                        event.currentTarget.value = '';
+                        setPreview(null);
+                        onFile?.(null);
+
+                        return;
+                    }
+
                     setPreview(file ? URL.createObjectURL(file) : null);
                     onFile?.(file ?? null);
                 }}

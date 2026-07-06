@@ -4,9 +4,8 @@ namespace App\Http\Requests;
 
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
-class StoreResidentRequest extends FormRequest
+class UpdateFeeTypeRequest extends FormRequest
 {
     /**
      * Determine if the user is authorized to make this request.
@@ -24,11 +23,7 @@ class StoreResidentRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name' => ['required', 'string', 'max:255'],
-            'phone' => ['required', 'string', 'max:30'],
-            'resident_status' => ['required', Rule::in(['tetap', 'kontrak'])],
-            'marital_status' => ['required', Rule::in(['menikah', 'belum_menikah'])],
-            'ktp_photo' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
+            'amount' => ['required', 'integer', 'min:1'],
         ];
     }
 }

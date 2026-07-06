@@ -4,8 +4,6 @@ Aplikasi web untuk administrasi iuran, penghuni, rumah, pembayaran, pengeluaran,
 
 ## Scope
 
-Produk mengikuti `PRD.md`:
-
 - Authentication admin RT.
 - Dashboard ringkasan rumah, penghuni, pemasukan, pengeluaran, saldo, dan tagihan belum lunas.
 - CRUD penghuni dengan upload dan preview foto KTP.
@@ -49,21 +47,7 @@ php artisan key:generate
 php artisan storage:link
 ```
 
-Set database di `.env`:
-
-```env
-APP_NAME="RT Finance"
-APP_URL=http://127.0.0.1:8000
-
-DB_CONNECTION=mysql
-DB_HOST=127.0.0.1
-DB_PORT=3306
-DB_DATABASE=rt_finance
-DB_USERNAME=root
-DB_PASSWORD=
-```
-
-Buat database MySQL, lalu jalankan migration dan seeder:
+Jalankan migration dan seeder:
 
 ```bash
 php artisan migrate --seed
@@ -95,16 +79,10 @@ php artisan serve
 npm run dev
 ```
 
-Buka aplikasi:
-
-```text
-http://127.0.0.1:8000
-```
-
 ## Default Login
 
 ```text
-Email    : admin@rt.test
+Email    : admin@gmail.com
 Password : password
 ```
 
@@ -154,7 +132,11 @@ erDiagram
         bigint id PK
         varchar name
         varchar email
+        timestamp email_verified_at
         varchar password
+        varchar remember_token
+        timestamp created_at
+        timestamp updated_at
     }
 
     RESIDENTS {
@@ -164,6 +146,8 @@ erDiagram
         varchar resident_status
         varchar marital_status
         varchar ktp_photo_path
+        timestamp created_at
+        timestamp updated_at
     }
 
     HOUSES {
@@ -171,6 +155,9 @@ erDiagram
         varchar number
         varchar block
         varchar status
+        text notes
+        timestamp created_at
+        timestamp updated_at
     }
 
     OCCUPANCIES {
@@ -181,14 +168,18 @@ erDiagram
         date ended_at
         varchar resident_status
         boolean is_active
+        timestamp created_at
+        timestamp updated_at
     }
 
     FEE_TYPES {
         bigint id PK
-        varchar code
         varchar name
+        varchar code
         integer amount
         boolean is_active
+        timestamp created_at
+        timestamp updated_at
     }
 
     BILLS {
@@ -201,6 +192,8 @@ erDiagram
         integer amount_due
         integer amount_paid
         varchar status
+        timestamp created_at
+        timestamp updated_at
     }
 
     PAYMENTS {
@@ -215,12 +208,16 @@ erDiagram
         integer amount
         varchar payment_method
         text notes
+        timestamp created_at
+        timestamp updated_at
     }
 
     EXPENSE_CATEGORIES {
         bigint id PK
         varchar name
         boolean is_routine
+        timestamp created_at
+        timestamp updated_at
     }
 
     EXPENSES {
@@ -231,6 +228,8 @@ erDiagram
         text description
         varchar receipt_path
         boolean is_routine
+        timestamp created_at
+        timestamp updated_at
     }
 
     HOUSES ||--o{ OCCUPANCIES : has

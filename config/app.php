@@ -56,6 +56,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Frontend Application URL
+    |--------------------------------------------------------------------------
+    |
+    | The separate SPA/FE app now owns auth screens (register, reset password).
+    | Notification links (e.g. password reset email) point here instead of
+    | this app's own routes.
+    |
+    */
+
+    'frontend_url' => env('FRONTEND_URL', 'http://localhost:4321'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Timezone
     |--------------------------------------------------------------------------
     |

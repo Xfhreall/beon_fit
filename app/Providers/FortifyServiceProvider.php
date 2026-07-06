@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Actions\Fortify\CreateNewUser;
 use App\Actions\Fortify\ResetUserPassword;
+use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -32,6 +33,7 @@ class FortifyServiceProvider extends ServiceProvider
         $this->configureActions();
         $this->configureViews();
         $this->configureRateLimiting();
+        $this->configureNotificationUrls();
     }
 
     /**
@@ -85,5 +87,19 @@ class FortifyServiceProvider extends ServiceProvider
             return Limit::perMinute(5)->by($throttleKey);
         });
 
+    }
+
+    /**
+     * Point notification links (password reset) at the separate FE app,
+     * which now owns the reset-password screen.
+     */
+    private function configureNotificationUrls(): void
+    {
+        ResetPassword::createUrlUsing(fn ($notifiable, string $token) => sprintf(
+            '%s/reset-password/%s?email=%s',
+            rtrim(config('app.frontend_url'), '/'),
+            $token,
+            urlencode($notifiable->getEmailForPasswordReset()),
+        ));
     }
 }

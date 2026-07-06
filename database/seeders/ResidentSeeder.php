@@ -13,7 +13,7 @@ class ResidentSeeder extends Seeder
         House::orderBy('number')->limit(15)->get()->each(function (House $house, int $index): void {
             $resident = Resident::factory()->create([
                 'name' => 'Warga '.str_pad((string) ($index + 1), 2, '0', STR_PAD_LEFT),
-                'resident_status' => $index < 12 ? 'tetap' : 'kontrak',
+                'resident_status' => 'tetap',
                 'marital_status' => $index % 3 === 0 ? 'belum_menikah' : 'menikah',
             ]);
 

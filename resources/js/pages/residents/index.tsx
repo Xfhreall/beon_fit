@@ -2,6 +2,7 @@ import { Head, router, useForm } from '@inertiajs/react';
 import { Edit, ImageIcon, Plus } from 'lucide-react';
 import type { FormEvent } from 'react';
 import { useMemo, useState } from 'react';
+import { toast } from 'sonner';
 import {
     destroy,
     index,
@@ -129,6 +130,10 @@ export default function ResidentsIndex({
             forceFormData: true,
             preserveScroll: true,
             onSuccess: () => setOpen(false),
+            onError: (errors: Record<string, string>) =>
+                toast.error(
+                    Object.values(errors)[0] ?? 'Gagal menyimpan penghuni.',
+                ),
         };
 
         if (editing) {

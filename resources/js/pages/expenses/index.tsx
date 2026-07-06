@@ -2,6 +2,7 @@ import { Head, router, useForm } from '@inertiajs/react';
 import { Plus } from 'lucide-react';
 import type { FormEvent } from 'react';
 import { useMemo, useState } from 'react';
+import { toast } from 'sonner';
 import {
     destroy,
     store,
@@ -151,6 +152,10 @@ export default function ExpensesIndex({
             forceFormData: true,
             preserveScroll: true,
             onSuccess: () => setOpen(false),
+            onError: (errors) =>
+                toast.error(
+                    Object.values(errors)[0] ?? 'Gagal menyimpan pengeluaran.',
+                ),
         });
     }
 

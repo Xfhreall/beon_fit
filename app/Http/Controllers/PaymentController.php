@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\RecordPayment;
 use App\Http\Requests\StorePaymentRequest;
 use App\Http\Requests\UpdatePaymentRequest;
 use App\Models\Bill;
@@ -9,11 +10,8 @@ use App\Models\FeeType;
 use App\Models\House;
 use App\Models\Payment;
 use App\Models\Resident;
-use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -55,154 +53,33 @@ class PaymentController extends Controller
         ]);
     }
 
-    public function store(StorePaymentRequest $request): RedirectResponse
+    public function store(StorePaymentRequest $request, RecordPayment $recordPayment): RedirectResponse
     {
-        $payment = DB::transaction(function () use ($request): Payment {
-            $data = $request->validated();
-            $data['paid_at'] = CarbonImmutable::parse((string) $data['paid_at'])->toDateTimeString();
-
-            $this->assertResidentOccupiesHouse($data);
-
-            $payment = Payment::create($data);
-            $this->ensureBillsExist($payment);
-            $this->recalculateBills($payment);
-
-            return $payment;
-        });
+        $payment = $recordPayment->store($request->validated());
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Pembayaran dicatat.']);
 
         return to_route('payments.index', ['month' => $payment->period_month, 'year' => $payment->period_year]);
     }
 
-    public function update(UpdatePaymentRequest $request, Payment $payment): RedirectResponse
+    public function update(UpdatePaymentRequest $request, Payment $payment, RecordPayment $recordPayment): RedirectResponse
     {
-        DB::transaction(function () use ($request, $payment): void {
-            $data = $request->validated();
-            $data['paid_at'] = CarbonImmutable::parse((string) $data['paid_at'])->toDateTimeString();
-
-            $payment->update($data);
-            $this->recalculateBills($payment);
-        });
+        $recordPayment->update($payment, $request->validated());
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Pembayaran diperbarui.']);
 
         return to_route('payments.index', ['month' => $payment->period_month, 'year' => $payment->period_year]);
     }
 
-    public function destroy(Payment $payment): RedirectResponse
+    public function destroy(Payment $payment, RecordPayment $recordPayment): RedirectResponse
     {
         $month = $payment->period_month;
         $year = $payment->period_year;
 
-        DB::transaction(function () use ($payment): void {
-            $context = $payment->replicate();
-
-            $payment->delete();
-            $this->recalculateBills($context);
-        });
+        $recordPayment->delete($payment);
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Pembayaran dihapus.']);
 
         return to_route('payments.index', ['month' => $month, 'year' => $year]);
-    }
-
-    /**
-     * @param  array<string, mixed>  $data
-     */
-    private function assertResidentOccupiesHouse(array $data): void
-    {
-        $period = CarbonImmutable::create((int) $data['period_year'], (int) $data['period_month'], 1);
-
-        $exists = House::whereKey($data['house_id'])
-            ->whereHas('occupancies', function ($query) use ($data, $period): void {
-                $query->where('resident_id', $data['resident_id'])
-                    ->where('started_at', '<=', $period->endOfMonth()->toDateString())
-                    ->where(function ($query) use ($period): void {
-                        $query->whereNull('ended_at')
-                            ->orWhere('ended_at', '>=', $period->startOfMonth()->toDateString());
-                    });
-            })
-            ->exists();
-
-        if (! $exists) {
-            throw ValidationException::withMessages([
-                'resident_id' => 'Penghuni harus aktif pada rumah untuk periode tagihan.',
-            ]);
-        }
-    }
-
-    private function ensureBillsExist(Payment $payment): void
-    {
-        $feeType = FeeType::findOrFail($payment->fee_type_id);
-
-        foreach ($this->paymentPeriods($payment) as $period) {
-            Bill::firstOrCreate([
-                'house_id' => $payment->house_id,
-                'fee_type_id' => $payment->fee_type_id,
-                'period_month' => $period['month'],
-                'period_year' => $period['year'],
-            ], [
-                'resident_id' => $payment->resident_id,
-                'amount_due' => $feeType->amount,
-                'amount_paid' => 0,
-                'status' => 'belum_lunas',
-            ]);
-        }
-    }
-
-    private function recalculateBills(Payment $payment): void
-    {
-        foreach ($this->paymentPeriods($payment) as $period) {
-            $bill = Bill::where('house_id', $payment->house_id)
-                ->where('fee_type_id', $payment->fee_type_id)
-                ->where('period_month', $period['month'])
-                ->where('period_year', $period['year'])
-                ->first();
-
-            if ($bill === null) {
-                continue;
-            }
-
-            $paid = Payment::where('house_id', $payment->house_id)
-                ->where('fee_type_id', $payment->fee_type_id)
-                ->get()
-                ->sum(fn (Payment $storedPayment): int => $this->allocatedAmountForPeriod($storedPayment, $period['year'], $period['month']));
-
-            $bill->update([
-                'amount_paid' => $paid,
-                'status' => $paid <= 0 ? 'belum_lunas' : ($paid >= $bill->amount_due ? 'lunas' : 'sebagian'),
-            ]);
-        }
-    }
-
-    /**
-     * @return array<int, array{year: int, month: int}>
-     */
-    private function paymentPeriods(Payment $payment): array
-    {
-        $start = CarbonImmutable::create($payment->period_year, $payment->period_month, 1);
-
-        return collect(range(0, $payment->months_paid - 1))
-            ->map(fn (int $offset): array => [
-                'year' => (int) $start->addMonths($offset)->year,
-                'month' => (int) $start->addMonths($offset)->month,
-            ])
-            ->all();
-    }
-
-    private function allocatedAmountForPeriod(Payment $payment, int $year, int $month): int
-    {
-        $periods = $this->paymentPeriods($payment);
-        $index = collect($periods)->search(fn (array $period): bool => $period['year'] === $year && $period['month'] === $month);
-
-        if ($index === false) {
-            return 0;
-        }
-
-        $base = intdiv($payment->amount, $payment->months_paid);
-        $remainder = $payment->amount % $payment->months_paid;
-
-        return $base + ($index === count($periods) - 1 ? $remainder : 0);
     }
 }

@@ -1,8 +1,9 @@
 import { Head, router, useForm } from '@inertiajs/react';
-import { Plus, RefreshCw } from 'lucide-react';
+import { Edit, Plus, RefreshCw } from 'lucide-react';
 import type { FormEvent } from 'react';
 import { useMemo, useState } from 'react';
 import BillGenerationController from '@/actions/App/Http/Controllers/BillGenerationController';
+import { update as updateFeeType } from '@/actions/App/Http/Controllers/FeeTypeController';
 import {
     destroy,
     index,
@@ -114,6 +115,10 @@ type GenerateFormData = {
     period_month: string;
     period_year: string;
 };
+type FeeTypeFormData = {
+    fee_type_id: string;
+    amount: string;
+};
 
 function paymentFormDefaults(filters: {
     month: number;
@@ -167,6 +172,7 @@ export default function PaymentsIndex({
 }) {
     const [open, setOpen] = useState(false);
     const [generateOpen, setGenerateOpen] = useState(false);
+    const [feeTypeOpen, setFeeTypeOpen] = useState(false);
     const [inputMode, setInputMode] = useState<'house' | 'resident'>('house');
     const [detailBill, setDetailBill] = useState<CombinedBill | null>(null);
     const [detailPayment, setDetailPayment] = useState<Payment | null>(null);
@@ -182,6 +188,10 @@ export default function PaymentsIndex({
     const generateForm = useForm<GenerateFormData>(
         generateFormDefaults(filters),
     );
+    const feeTypeForm = useForm<FeeTypeFormData>({
+        fee_type_id: feeTypes[0] ? String(feeTypes[0].id) : '',
+        amount: feeTypes[0] ? String(feeTypes[0].amount) : '',
+    });
     const selectedHouse = useMemo(
         () => houses.find((house) => String(house.id) === form.data.house_id),
         [houses, form.data.house_id],
@@ -296,6 +306,28 @@ export default function PaymentsIndex({
         });
     }
 
+    function submitFeeType(event: FormEvent) {
+        event.preventDefault();
+
+        if (!feeTypeForm.data.fee_type_id) {
+            return;
+        }
+
+        feeTypeForm.patch(
+            updateFeeType.url(Number(feeTypeForm.data.fee_type_id)),
+            {
+                preserveScroll: true,
+                onSuccess: () => setFeeTypeOpen(false),
+            },
+        );
+    }
+
+    function setFeeTypeForEdit(value: string) {
+        feeTypeForm.setData('fee_type_id', value);
+        const fee = feeTypes.find((item) => String(item.id) === value);
+        feeTypeForm.setData('amount', fee ? String(fee.amount) : '');
+    }
+
     function setFee(value: string) {
         form.setData('fee_type_id', value);
         const fee = feeTypes.find((item) => String(item.id) === value);
@@ -343,6 +375,93 @@ export default function PaymentsIndex({
                         </p>
                     </div>
                     <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                        <Dialog
+                            open={feeTypeOpen}
+                            onOpenChange={setFeeTypeOpen}
+                        >
+                            <DialogTrigger asChild>
+                                <Button
+                                    variant="outline"
+                                    className="w-full sm:w-auto"
+                                    disabled={feeTypes.length === 0}
+                                >
+                                    <Edit className="size-4" />
+                                    Ubah nominal iuran
+                                </Button>
+                            </DialogTrigger>
+                            <DialogContent>
+                                <form
+                                    onSubmit={submitFeeType}
+                                    className="grid gap-4"
+                                >
+                                    <DialogHeader>
+                                        <DialogTitle>
+                                            Ubah nominal iuran
+                                        </DialogTitle>
+                                    </DialogHeader>
+                                    <div className="grid gap-3">
+                                        <div className="grid gap-2">
+                                            <Label>Jenis iuran</Label>
+                                            <Select
+                                                value={
+                                                    feeTypeForm.data.fee_type_id
+                                                }
+                                                onValueChange={
+                                                    setFeeTypeForEdit
+                                                }
+                                            >
+                                                <SelectTrigger className="w-full">
+                                                    <SelectValue placeholder="Pilih iuran" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {feeTypes.map((feeType) => (
+                                                        <SelectItem
+                                                            key={feeType.id}
+                                                            value={String(
+                                                                feeType.id,
+                                                            )}
+                                                        >
+                                                            {feeType.name} -{' '}
+                                                            {money(
+                                                                feeType.amount,
+                                                            )}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="fee_amount">
+                                                Nominal
+                                            </Label>
+                                            <Input
+                                                id="fee_amount"
+                                                type="number"
+                                                min="1"
+                                                value={feeTypeForm.data.amount}
+                                                onChange={(event) =>
+                                                    feeTypeForm.setData(
+                                                        'amount',
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                required
+                                            />
+                                        </div>
+                                    </div>
+                                    <DialogFooter>
+                                        <Button
+                                            type="submit"
+                                            disabled={feeTypeForm.processing}
+                                        >
+                                            {feeTypeForm.processing
+                                                ? 'Menyimpan...'
+                                                : 'Simpan'}
+                                        </Button>
+                                    </DialogFooter>
+                                </form>
+                            </DialogContent>
+                        </Dialog>
                         <Dialog
                             open={generateOpen}
                             onOpenChange={setGenerateOpen}
