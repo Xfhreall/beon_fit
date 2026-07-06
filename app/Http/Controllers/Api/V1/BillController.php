@@ -25,8 +25,7 @@ class BillController extends Controller
             ->when($request->string('status')->toString() !== '', fn ($query) => $query->where('status', $request->string('status')->toString()))
             ->orderBy('status')
             ->orderBy('house_id')
-            ->paginate($this->perPage($request))
-            ->withQueryString();
+            ->get();
 
         return BillResource::collection($bills);
     }

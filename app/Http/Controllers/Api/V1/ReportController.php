@@ -33,16 +33,31 @@ class ReportController extends Controller
                     'accumulated_balance' => $this->accumulatedBalance($year, $month),
                 ],
                 'yearly' => $this->yearlySeries($year),
-                'income_details' => PaymentResource::collection(Payment::with(['house:id,number', 'resident:id,name', 'feeType:id,name'])
-                    ->where('period_year', $year)
-                    ->where('period_month', $month)
-                    ->latest('paid_at')
-                    ->get())->resolve($request),
-                'expense_details' => ExpenseResource::collection(Expense::with('category:id,name')
-                    ->whereYear('spent_at', $year)
-                    ->whereMonth('spent_at', $month)
-                    ->latest('spent_at')
-                    ->get())->resolve($request),
+                'income_details' => PaymentResource::collection(
+                    Payment::with(['house:id,number', 'resident:id,name', 'feeType:id,name'])
+                        ->where('period_year', $year)
+                        ->where('period_month', $month)
+                        ->latest('paid_at')
+                        ->latest('payments.id')
+                        ->paginate(
+                            perPage: $this->perPage($request, 'income_per_page'),
+                            pageName: 'income_page',
+                            page: (int) $request->integer('income_page', 1),
+                        )
+                        ->withQueryString()
+                )->response()->getData(true),
+                'expense_details' => ExpenseResource::collection(
+                    Expense::with('category:id,name')
+                        ->whereYear('spent_at', $year)
+                        ->whereMonth('spent_at', $month)
+                        ->latest('spent_at')
+                        ->paginate(
+                            perPage: $this->perPage($request, 'expense_per_page'),
+                            pageName: 'expense_page',
+                            page: (int) $request->integer('expense_page', 1),
+                        )
+                        ->withQueryString()
+                )->response()->getData(true),
                 'expense_composition' => Expense::with('category:id,name')
                     ->whereYear('spent_at', $year)
                     ->whereMonth('spent_at', $month)
